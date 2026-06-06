@@ -1,0 +1,31 @@
+/* Ionic theme — selaras design-system.md (emerald, light-mode dominan) */
+:root {
+  --ion-color-primary: #198754;
+  --ion-color-primary-rgb: 25, 135, 84;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #0f5132;
+  --ion-color-primary-tint: #31935f;
+
+  --ion-background-color: #f8fafc;
+  --ion-background-color-rgb: 248, 250, 252;
+
+  --ion-text-color: #1e293b;
+  --ion-text-color-rgb: 30, 41, 59;
+
+  --ion-toolbar-background: #ffffff;
+  --ion-tab-bar-background: #ffffff;
+  --ion-item-background: #ffffff;
+
+  --ion-font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+
+  --ion-color-step-50: #f1f5f9;
+  --ion-color-step-100: #e2e8f0;
+  --ion-color-medium: #64748b;
+}
+
+/* Paksa light mode (produk dominan terang). */
+body {
+  color: #1e293b;
+  background: #f8fafc;
+}

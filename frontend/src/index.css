@@ -1,0 +1,216 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---------- Toolbar / Header (low-profile, bersih) ---------- */
+ion-toolbar {
+  --border-width: 0 !important;
+  --border-color: transparent;
+  --background: #f8fafc;
+  --min-height: 52px;
+}
+ion-header.header-md::after,
+ion-header.header-ios::after {
+  display: none; /* hilangkan garis bawah default */
+}
+/* Large title ala native (restrained agar tetap kompak) */
+ion-title.title-large,
+ion-toolbar ion-title[size='large'] {
+  font-weight: 800;
+  font-size: 1.55rem;
+  color: #1e293b;
+}
+/* Header transparan menyatu dengan background terang */
+ion-header ion-toolbar {
+  --background: #f8fafc;
+}
+
+/* ---------- Tab bar: ikon filled emerald saat aktif ---------- */
+ion-tab-bar {
+  --background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-top: 1px solid #eef2f6;
+  padding-bottom: env(safe-area-inset-bottom);
+  height: calc(58px + env(safe-area-inset-bottom));
+}
+ion-tab-button {
+  --color: #94a3b8;
+  --color-selected: #198754;
+}
+ion-tab-button ion-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-top: 2px;
+}
+ion-tab-button .icon-active {
+  display: none;
+}
+ion-tab-button.tab-selected .icon-active {
+  display: block;
+}
+ion-tab-button.tab-selected .icon-inactive {
+  display: none;
+}
+ion-tab-button.tab-selected ion-icon {
+  transform: translateY(-1px) scale(1.05);
+  transition: transform 0.2s ease;
+}
+
+/* ---------- Kartu ---------- */
+.kbn-card {
+  background: #ffffff;
+  border: 1px solid #eef2f6;
+  border-radius: 18px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+}
+.kbn-card-press {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.kbn-card-press:active {
+  transform: scale(0.985);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
+/* Hero gradient emerald */
+.kbn-hero {
+  background: linear-gradient(135deg, #0f5132 0%, #198754 55%, #21a366 100%);
+  border-radius: 22px;
+  color: #fff;
+  box-shadow: 0 10px 24px -8px rgba(15, 81, 50, 0.45);
+  position: relative;
+  overflow: hidden;
+}
+.kbn-hero::after {
+  content: '';
+  position: absolute;
+  right: -28px;
+  top: -28px;
+  width: 140px;
+  height: 140px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+}
+.kbn-hero::before {
+  content: '';
+  position: absolute;
+  right: 36px;
+  bottom: -48px;
+  width: 120px;
+  height: 120px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+}
+
+/* ---------- Avatar komoditas ---------- */
+.kbn-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  flex-shrink: 0;
+}
+
+/* ---------- Badge ---------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 9999px;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1rem;
+  white-space: nowrap;
+}
+.badge-semai { background: #fef3c7; color: #b45309; }
+.badge-aktif { background: #dcfce7; color: #15803d; }
+.badge-selesai { background: #e2e8f0; color: #475569; }
+.badge-keluar { background: #ffe4e6; color: #b91c1c; }
+
+/* ---------- Skeleton shimmer ---------- */
+.kbn-skeleton {
+  background: linear-gradient(100deg, #eef2f6 30%, #f8fafc 50%, #eef2f6 70%);
+  background-size: 200% 100%;
+  animation: kbn-shimmer 1.3s ease-in-out infinite;
+  border-radius: 10px;
+}
+@keyframes kbn-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ---------- Micro animation (ringan, transform/opacity saja) ---------- */
+.kbn-fade-up {
+  animation: kbn-fade-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes kbn-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.kbn-stagger > * { animation: kbn-fade-up 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.kbn-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.kbn-stagger > *:nth-child(2) { animation-delay: 0.06s; }
+.kbn-stagger > *:nth-child(3) { animation-delay: 0.10s; }
+.kbn-stagger > *:nth-child(4) { animation-delay: 0.14s; }
+.kbn-stagger > *:nth-child(5) { animation-delay: 0.18s; }
+.kbn-stagger > *:nth-child(6) { animation-delay: 0.22s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kbn-fade-up,
+  .kbn-stagger > *,
+  .kbn-skeleton {
+    animation: none;
+  }
+}
+
+/* ---------- Segment (filter) ---------- */
+ion-segment.kbn-segment {
+  --background: #eef2f6;
+  border-radius: 12px;
+  padding: 3px;
+}
+ion-segment.kbn-segment ion-segment-button {
+  --background-checked: #ffffff;
+  --color: #64748b;
+  --color-checked: #0f5132;
+  --indicator-color: #ffffff;
+  --border-radius: 9px;
+  min-height: 32px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: none;
+}
+
+/* ---------- Searchbar ---------- */
+ion-searchbar.kbn-search {
+  --background: #ffffff;
+  --border-radius: 14px;
+  --box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --placeholder-color: #94a3b8;
+  padding-inline: 0;
+  padding-top: 0;
+  padding-bottom: 8px;
+}
+
+/* FAB sedikit lebih lembut */
+ion-fab-button {
+  --box-shadow: 0 8px 20px -6px rgba(25, 135, 84, 0.5);
+}
+
+/* Content background */
+ion-content {
+  --background: #f8fafc;
+}

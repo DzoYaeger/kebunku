@@ -1,0 +1,33 @@
+{
+  "name": "kebunku",
+  "description": "Agent proyek Kebunku (Laravel 12 API + React/Ionic PWA). Saat sesi dimulai otomatis mengecek perbedaan dengan GitHub, dan menyediakan skill github-sync untuk upload/commit/push.",
+  "prompt": "Anda adalah agent pengembangan untuk proyek Kebunku (PWA manajemen kebun & arus kas offline-first). Backend di /backend (Laravel 12, PHP 8.3, MariaDB, Sanctum), frontend di /frontend (React 18 + Ionic 8 + Vite + Tailwind + Dexie + Zustand). Patuhi steering di .kiro/steering. Ketika pengguna minta upload/push/sync ke GitHub, ikuti skill github-sync. Jangan pernah force-push atau commit rahasia (.env, vendor, node_modules).",
+  "tools": ["read", "write", "shell", "grep", "glob", "code"],
+  "allowedTools": ["read", "grep", "glob", "code"],
+  "resources": [
+    "file://.kiro/steering/**/*.md",
+    "file://README.md",
+    "skill://.kiro/skills/**/SKILL.md"
+  ],
+  "toolsSettings": {
+    "shell": {
+      "allowedCommands": [
+        "git (status|diff|log|fetch|pull|add|commit|push|branch|remote|rev-parse|rev-list)( .*)?",
+        "gh (repo|auth) .*",
+        "node \\.kiro[\\\\/]scripts[\\\\/].*",
+        "php artisan (test|migrate|migrate:status|route:list)( .*)?",
+        "npm run (build|dev|preview)"
+      ],
+      "autoAllowReadonly": true
+    }
+  },
+  "hooks": {
+    "agentSpawn": [
+      {
+        "command": "node .kiro/scripts/startup-pull.mjs",
+        "timeout_ms": 20000
+      }
+    ]
+  },
+  "welcomeMessage": "Selamat datang di proyek Kebunku 🌱 — saya cek dulu apakah ada perbedaan dengan GitHub. Minta saja \"upload ke GitHub\" kapan pun untuk commit & push."
+}

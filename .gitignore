@@ -1,0 +1,30 @@
+# Root .gitignore — melengkapi backend/.gitignore & frontend/.gitignore
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log
+
+# Dependencies (jaga-jaga bila pattern nested tak terbaca)
+**/node_modules/
+**/vendor/
+
+# Build artefak frontend
+frontend/dist/
+frontend/dev-dist/
+
+# Database SQLite lokal (dev) — jangan commit data biner
+backend/database/*.sqlite
+backend/database/*.sqlite-journal
+
+# Env (jaga-jaga; backend/.gitignore sudah meng-ignore .env)
+**/.env
+!**/.env.example
+
+# File sementara
+*.tmp

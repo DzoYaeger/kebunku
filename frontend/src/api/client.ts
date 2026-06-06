@@ -1,0 +1,44 @@
+import axios, { AxiosError } from 'axios';
+import { getToken, setToken, UNAUTHORIZED_EVENT } from './token';
+
+// Base URL: gunakan VITE_API_URL bila ada, default proxy '/api' (lihat vite.config.ts).
+const baseURL = import.meta.env.VITE_API_URL ?? '/api';
+
+export const api = axios.create({
+  baseURL,
+  headers: {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  },
+});
+
+// Tempelkan Bearer token pada setiap request.
+api.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Tangani 401: cabut token lokal & beri tahu app untuk logout.
+api.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      setToken(null);
+      window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
+    }
+    return Promise.reject(error);
+  },
+);
+
+// Helper: deteksi error validasi server (422) — bukan error jaringan.
+export function isValidationError(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 422;
+}
+
+// Helper: deteksi kegagalan jaringan (tidak ada response dari server).
+export function isNetworkError(error: unknown): boolean {
+  return axios.isAxiosError(error) && !error.response;
+}
