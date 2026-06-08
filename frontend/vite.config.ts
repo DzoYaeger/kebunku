@@ -39,6 +39,11 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Langsung aktifkan SW baru tanpa menunggu tab ditutup.
+        skipWaiting: true,
+        clientsClaim: true,
+        // Hapus cache dari versi lama secara otomatis.
+        cleanupOutdatedCaches: true,
         // Cache GET API agar data tetap terbaca offline (sumber kebenaran tetap server).
         runtimeCaching: [
           {

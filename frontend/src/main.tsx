@@ -19,6 +19,13 @@ import App from './App';
 
 setupIonicReact({ mode: 'ios' });
 
+// Reload otomatis saat service worker baru aktif (ada deployment baru).
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+}
+
 const container = document.getElementById('root');
 if (!container) throw new Error('Root element tidak ditemukan');
 
