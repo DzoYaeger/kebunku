@@ -80,6 +80,7 @@ async function processItem(item: SyncItem): Promise<void> {
       client_uuid: payload.client_uuid,
       tipe: payload.tipe,
       kategori: payload.kategori,
+      komoditas: payload.komoditas,
       nominal: payload.nominal,
       tanggal: payload.tanggal,
       lahan_id: lahanServerId,
@@ -178,4 +179,15 @@ export function stopSyncEngine(): void {
     clearInterval(intervalId);
     intervalId = null;
   }
+}
+
+// Retry semua item yang berstatus 'failed': reset ke 'pending' lalu jalankan sync.
+export async function retryFailed(): Promise<void> {
+  const failed = await db.sync_queue.where('status').equals('failed').toArray();
+  for (const item of failed) {
+    if (item.id !== undefined) {
+      await db.sync_queue.update(item.id, { status: 'pending', attempts: 0 });
+    }
+  }
+  await runSync();
 }

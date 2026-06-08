@@ -18,6 +18,7 @@ class Transaksi extends Model
         'client_uuid',
         'tipe',
         'kategori',
+        'komoditas',
         'nominal',
         'tanggal',
         'lahan_id',

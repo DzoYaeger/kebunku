@@ -72,6 +72,7 @@ export async function hydrateFromServer(): Promise<void> {
         server_id: t.id,
         tipe: t.tipe,
         kategori: t.kategori,
+        komoditas: t.komoditas ?? null,
         nominal: t.nominal,
         tanggal: t.tanggal,
         lahan_uuid: lahanUuid,

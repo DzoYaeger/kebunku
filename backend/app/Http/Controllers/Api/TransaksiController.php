@@ -18,16 +18,20 @@ class TransaksiController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        // Saldo MVP: 0 dikurangi total kas keluar (Req 4: agregasi, tidak disimpan).
         $totalKeluar = $request->user()->transaksi()
             ->where('tipe', 'kas_keluar')
+            ->sum('nominal');
+
+        $totalMasuk = $request->user()->transaksi()
+            ->where('tipe', 'kas_masuk')
             ->sum('nominal');
 
         return response()->json([
             'data' => TransaksiResource::collection($transaksi),
             'meta' => [
                 'total_kas_keluar' => number_format((float) $totalKeluar, 2, '.', ''),
-                'saldo' => number_format(0 - (float) $totalKeluar, 2, '.', ''),
+                'total_kas_masuk' => number_format((float) $totalMasuk, 2, '.', ''),
+                'saldo' => number_format((float) $totalMasuk - (float) $totalKeluar, 2, '.', ''),
             ],
         ]);
     }
@@ -51,6 +55,7 @@ class TransaksiController extends Controller
             'client_uuid' => $clientUuid,
             'tipe' => $request->input('tipe', 'kas_keluar'),
             'kategori' => $request->string('kategori'),
+            'komoditas' => $request->input('komoditas'),
             'nominal' => $request->input('nominal'),
             'tanggal' => $request->date('tanggal'),
             'lahan_id' => $request->input('lahan_id'),
@@ -67,5 +72,18 @@ class TransaksiController extends Controller
         $transaksi->delete();
 
         return response()->json(null, 204);
+    }
+
+    public function ringkasanKomoditas(Request $request): JsonResponse
+    {
+        $data = $request->user()->transaksi()
+            ->where('tipe', 'kas_masuk')
+            ->whereNotNull('komoditas')
+            ->selectRaw('komoditas, SUM(nominal) as total, COUNT(*) as jumlah_transaksi')
+            ->groupBy('komoditas')
+            ->orderByDesc('total')
+            ->get();
+
+        return response()->json(['data' => $data]);
     }
 }

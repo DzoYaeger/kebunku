@@ -20,6 +20,7 @@ class TransaksiResource extends JsonResource
             'client_uuid' => $this->client_uuid,
             'tipe' => $this->tipe,
             'kategori' => $this->kategori,
+            'komoditas' => $this->komoditas,
             'nominal' => (string) $this->nominal,
             'tanggal' => $this->tanggal?->toDateString(),
             'lahan_id' => $this->lahan_id,

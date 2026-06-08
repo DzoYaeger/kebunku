@@ -27,8 +27,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/aktivitas', [AktivitasController::class, 'store']);
     Route::delete('/aktivitas/{aktivita}', [AktivitasController::class, 'destroy']);
 
-    // Transaksi (Kas Keluar)
+    // Transaksi (Kas Keluar & Kas Masuk)
     Route::get('/transaksi', [TransaksiController::class, 'index']);
+    Route::get('/transaksi/ringkasan-komoditas', [TransaksiController::class, 'ringkasanKomoditas']);
     Route::post('/transaksi', [TransaksiController::class, 'store']);
     Route::delete('/transaksi/{transaksi}', [TransaksiController::class, 'destroy']);
 });

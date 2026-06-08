@@ -13,12 +13,15 @@ import {
   IonAlert,
   IonSearchbar,
   IonActionSheet,
+  IonSegment,
+  IonSegmentButton,
+  IonLabel,
   IonRefresher,
   IonRefresherContent,
   useIonViewWillEnter,
   useIonRouter,
 } from '@ionic/react';
-import { add, leafOutline, layersOutline, swapVerticalOutline } from 'ionicons/icons';
+import { add, leafOutline, layersOutline, swapVerticalOutline, sparklesOutline, checkmarkCircleOutline } from 'ionicons/icons';
 import type { LahanLocal } from '../../db';
 import { lahanRepo, type LahanInput } from '../../db/repository';
 import { runSync } from '../../sync/SyncEngine';
@@ -35,6 +38,7 @@ import { LahanFormModal } from './LahanFormModal';
 const OFFLINE_MSG = 'Disimpan secara lokal (Mode Offline)';
 
 type SortMode = 'newest' | 'az' | 'za';
+type StatusFilter = 'semua' | 'semai' | 'aktif' | 'selesai';
 const SORT_LABEL: Record<SortMode, string> = { newest: 'Terbaru', az: 'A → Z', za: 'Z → A' };
 
 interface Group {
@@ -50,6 +54,7 @@ export default function LahanListPage(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [grouped, setGrouped] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('semua');
   const [sort, setSort] = useState<SortMode>('newest');
   const [sortSheet, setSortSheet] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -69,9 +74,7 @@ export default function LahanListPage(): React.JSX.Element {
     try {
       await hydrateFromServer();
       await reload();
-    } catch {
-      /* offline / gagal — pakai data lokal */
-    }
+    } catch {/* pakai data lokal */}
   }, [reload]);
 
   useIonViewWillEnter(() => {
@@ -82,31 +85,40 @@ export default function LahanListPage(): React.JSX.Element {
     })();
   });
 
-  // 1) filter pencarian
+  const stats = useMemo(() => {
+    const semai = items.filter((l) => l.status === 'semai').length;
+    const aktif = items.filter((l) => l.status === 'aktif').length;
+    const selesai = items.filter((l) => l.status === 'selesai').length;
+    return { total: items.length, semai, aktif, selesai, komoditas: komoditasOptions.length };
+  }, [items, komoditasOptions]);
+
+  // 1) filter status
+  const statusFiltered = useMemo(() => {
+    if (statusFilter === 'semua') return items;
+    return items.filter((l) => l.status === statusFilter);
+  }, [items, statusFilter]);
+
+  // 2) filter pencarian
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
+    if (!q) return statusFiltered;
+    return statusFiltered.filter(
       (l) => l.komoditas.toLowerCase().includes(q) || l.nomor_bed.toLowerCase().includes(q),
     );
-  }, [items, query]);
+  }, [statusFiltered, query]);
 
-  // 2) urutkan
+  // 3) urutkan
   const sorted = useMemo(() => {
     const copy = [...filtered];
     const byBed = (a: LahanLocal, b: LahanLocal): number =>
       a.nomor_bed.localeCompare(b.nomor_bed, 'id', { numeric: true });
-    if (sort === 'az') {
-      copy.sort((a, b) => a.komoditas.localeCompare(b.komoditas, 'id') || byBed(a, b));
-    } else if (sort === 'za') {
-      copy.sort((a, b) => b.komoditas.localeCompare(a.komoditas, 'id') || byBed(a, b));
-    } else {
-      copy.sort((a, b) => b.created_at.localeCompare(a.created_at));
-    }
+    if (sort === 'az') copy.sort((a, b) => a.komoditas.localeCompare(b.komoditas, 'id') || byBed(a, b));
+    else if (sort === 'za') copy.sort((a, b) => b.komoditas.localeCompare(a.komoditas, 'id') || byBed(a, b));
+    else copy.sort((a, b) => b.created_at.localeCompare(a.created_at));
     return copy;
   }, [filtered, sort]);
 
-  // 3) kelompokkan per jenis tanaman (jika aktif)
+  // 4) kelompokkan
   const groups = useMemo<Group[]>(() => {
     if (!grouped) return [];
     const map = new Map<string, Group>();
@@ -116,13 +128,8 @@ export default function LahanListPage(): React.JSX.Element {
       if (existing) existing.items.push(l);
       else map.set(key, { key, nama: l.komoditas.trim(), items: [l] });
     }
-    const arr = [...map.values()];
-    if (sort === 'za') arr.sort((a, b) => b.nama.localeCompare(a.nama, 'id'));
-    else if (sort === 'az') arr.sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
-    return arr;
-  }, [grouped, sorted, sort]);
-
-  const aktifCount = useMemo(() => items.filter((l) => l.status === 'aktif').length, [items]);
+    return [...map.values()];
+  }, [grouped, sorted]);
 
   const openDetail = (lahan: LahanLocal): void => {
     router.push(`/app/tanaman/${lahan.client_uuid}`, 'forward', 'push');
@@ -147,17 +154,8 @@ export default function LahanListPage(): React.JSX.Element {
     else setToast(OFFLINE_MSG);
   };
 
-  const openNew = (): void => {
-    setEditing(null);
-    setModalOpen(true);
-  };
-  const openEdit = (lahan: LahanLocal): void => {
-    setEditing(lahan);
-    setModalOpen(true);
-  };
-
-  const summary =
-    items.length === 0 ? 'Kelola tanaman di tiap bedengan' : `${items.length} tanaman · ${aktifCount} aktif`;
+  const openNew = (): void => { setEditing(null); setModalOpen(true); };
+  const openEdit = (lahan: LahanLocal): void => { setEditing(lahan); setModalOpen(true); };
 
   const pill = (active: boolean): string =>
     `flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-caption font-semibold transition-colors ${
@@ -165,26 +163,16 @@ export default function LahanListPage(): React.JSX.Element {
     }`;
 
   const renderCard = (lahan: LahanLocal): React.JSX.Element => (
-    <LahanCard
-      key={lahan.client_uuid}
-      lahan={lahan}
-      onOpen={openDetail}
-      onEdit={openEdit}
-      onDelete={setToDelete}
-    />
+    <LahanCard key={lahan.client_uuid} lahan={lahan} onOpen={openDetail} onEdit={openEdit} onDelete={setToDelete} />
   );
 
   return (
     <IonPage>
       <IonHeader className="ion-no-border">
         <IonToolbar>
-          <IonButtons slot="start">
-            <AccountButton />
-          </IonButtons>
+          <IonButtons slot="start"><AccountButton /></IonButtons>
           <IonTitle>Tanaman</IonTitle>
-          <IonButtons slot="end">
-            <SyncIndicator />
-          </IonButtons>
+          <IonButtons slot="end"><SyncIndicator /></IonButtons>
         </IonToolbar>
       </IonHeader>
 
@@ -193,68 +181,122 @@ export default function LahanListPage(): React.JSX.Element {
           <IonRefresherContent />
         </IonRefresher>
 
-        <IonHeader collapse="condense" className="ion-no-border">
-          <IonToolbar>
-            <IonTitle size="large" className="title-large">
-              Tanaman
-            </IonTitle>
-          </IonToolbar>
-        </IonHeader>
-
-        <div className="px-4">
-          <p className="text-caption text-slate-muted -mt-1 mb-2">{summary}</p>
-
-          {items.length > 0 && (
-            <>
-              <IonSearchbar
-                className="kbn-search"
-                value={query}
-                onIonInput={(e) => setQuery(e.detail.value ?? '')}
-                placeholder="Cari tanaman / bed"
-                debounce={120}
-              />
-
-              {/* Kontrol Grup & Urutkan */}
-              <div className="flex items-center gap-2 mb-3">
-                <button type="button" className={pill(grouped)} onClick={() => setGrouped((g) => !g)}>
-                  <IonIcon icon={layersOutline} className="text-sm" />
-                  Grup
-                </button>
-                <button type="button" className={pill(false)} onClick={() => setSortSheet(true)}>
-                  <IonIcon icon={swapVerticalOutline} className="text-sm" />
-                  {SORT_LABEL[sort]}
-                </button>
-              </div>
-            </>
-          )}
-
+        <div className="px-4 pb-24 pt-2">
           {loading ? (
-            <CardSkeleton count={4} />
-          ) : items.length === 0 ? (
-            <EmptyState
-              icon={leafOutline}
-              title="Belum ada tanaman"
-              subtitle="Tambahkan tanaman pertama Anda untuk mulai mencatat perawatan."
-              actionLabel="Tambah Tanaman"
-              onAction={openNew}
-            />
-          ) : sorted.length === 0 ? (
-            <p className="text-center text-body text-slate-muted mt-10">Tidak ada hasil untuk “{query}”.</p>
-          ) : grouped ? (
-            <div className="pb-24">
-              {groups.map((g) => (
-                <div key={g.key} className="mb-4">
-                  <div className="flex items-center gap-2 px-1 mb-2">
-                    <CommodityAvatar komoditas={g.nama} className="!w-7 !h-7 !text-base !rounded-lg" />
-                    <span className="text-heading-md text-slate-dark">{g.nama}</span>
-                    <span className="text-caption text-slate-muted">· {g.items.length}</span>
-                  </div>
-                  <div className="kbn-stagger">{g.items.map(renderCard)}</div>
-                </div>
-              ))}
-            </div>
+            <CardSkeleton count={4} hero />
           ) : (
-            <div className="kbn-stagger pb-24">{sorted.map(renderCard)}</div>
+            <>
+              {/* ═══ HERO STATS ═══ */}
+              {items.length > 0 && (
+                <div className="kbn-hero kbn-fade-up p-5 mb-5">
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-1.5 text-white/70">
+                      <IonIcon icon={leafOutline} className="text-base" />
+                      <span className="text-[0.75rem] font-semibold tracking-wide uppercase">Kebun Saya</span>
+                    </div>
+                    <p className="text-[2rem] font-extrabold mt-1 leading-none">
+                      {stats.total} <span className="text-[1rem] font-semibold text-white/70">tanaman</span>
+                    </p>
+                    <div className="grid grid-cols-3 gap-2 mt-4 pt-3.5 border-t border-white/15">
+                      <div className="text-center">
+                        <div className="w-8 h-8 rounded-xl bg-[#FEF3C7]/20 flex items-center justify-center mx-auto mb-1">
+                          <IonIcon icon={sparklesOutline} className="text-[#FCD34D] text-lg" />
+                        </div>
+                        <p className="text-[1rem] font-bold">{stats.semai}</p>
+                        <p className="text-[0.6rem] text-white/60">Semai</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="w-8 h-8 rounded-xl bg-[#86efac]/20 flex items-center justify-center mx-auto mb-1">
+                          <IonIcon icon={leafOutline} className="text-[#86efac] text-lg" />
+                        </div>
+                        <p className="text-[1rem] font-bold">{stats.aktif}</p>
+                        <p className="text-[0.6rem] text-white/60">Aktif</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center mx-auto mb-1">
+                          <IonIcon icon={checkmarkCircleOutline} className="text-white/70 text-lg" />
+                        </div>
+                        <p className="text-[1rem] font-bold">{stats.selesai}</p>
+                        <p className="text-[0.6rem] text-white/60">Selesai</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ═══ SEARCH & CONTROLS ═══ */}
+              {items.length > 0 && (
+                <>
+                  <IonSearchbar
+                    className="kbn-search"
+                    value={query}
+                    onIonInput={(e) => setQuery(e.detail.value ?? '')}
+                    placeholder="Cari tanaman / bed"
+                    debounce={120}
+                  />
+
+                  {/* Status filter */}
+                  <IonSegment
+                    className="kbn-segment mb-3"
+                    value={statusFilter}
+                    onIonChange={(e) => setStatusFilter((e.detail.value as StatusFilter) ?? 'semua')}
+                    scrollable
+                  >
+                    <IonSegmentButton value="semua"><IonLabel>Semua</IonLabel></IonSegmentButton>
+                    <IonSegmentButton value="semai"><IonLabel>Semai</IonLabel></IonSegmentButton>
+                    <IonSegmentButton value="aktif"><IonLabel>Aktif</IonLabel></IonSegmentButton>
+                    <IonSegmentButton value="selesai"><IonLabel>Selesai</IonLabel></IonSegmentButton>
+                  </IonSegment>
+
+                  {/* Kontrol Grup & Urutkan */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <button type="button" className={pill(grouped)} onClick={() => setGrouped((g) => !g)}>
+                      <IonIcon icon={layersOutline} className="text-sm" />
+                      Grup
+                    </button>
+                    <button type="button" className={pill(false)} onClick={() => setSortSheet(true)}>
+                      <IonIcon icon={swapVerticalOutline} className="text-sm" />
+                      {SORT_LABEL[sort]}
+                    </button>
+                    <span className="ml-auto text-[0.7rem] text-slate-muted font-medium">
+                      {sorted.length} hasil
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {/* ═══ LIST ═══ */}
+              {items.length === 0 ? (
+                <EmptyState
+                  icon={leafOutline}
+                  title="Belum ada tanaman"
+                  subtitle="Tambahkan tanaman pertama Anda untuk mulai mencatat perawatan."
+                  actionLabel="Tambah Tanaman"
+                  onAction={openNew}
+                />
+              ) : sorted.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-body text-slate-muted">Tidak ada hasil untuk pencarian ini.</p>
+                </div>
+              ) : grouped ? (
+                <div>
+                  {groups.map((g) => (
+                    <div key={g.key} className="mb-5">
+                      <div className="flex items-center gap-2.5 px-1 mb-2.5">
+                        <CommodityAvatar komoditas={g.nama} className="!w-8 !h-8 !text-lg !rounded-xl" />
+                        <div>
+                          <span className="text-[0.88rem] font-bold text-slate-dark">{g.nama}</span>
+                          <p className="text-[0.65rem] text-slate-muted">{g.items.length} bedengan</p>
+                        </div>
+                      </div>
+                      <div className="kbn-stagger">{g.items.map(renderCard)}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="kbn-stagger">{sorted.map(renderCard)}</div>
+              )}
+            </>
           )}
         </div>
 

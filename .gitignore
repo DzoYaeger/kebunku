@@ -28,3 +28,6 @@ backend/database/*.sqlite-journal
 
 # File sementara
 *.tmp
+
+# Composer binary (jangan commit)
+**/composer.phar

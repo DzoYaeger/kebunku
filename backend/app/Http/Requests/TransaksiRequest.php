@@ -21,8 +21,9 @@ class TransaksiRequest extends FormRequest
 
         return [
             'client_uuid' => ['required', 'uuid'],
-            'tipe' => ['sometimes', Rule::in(['kas_keluar'])],
+            'tipe' => ['sometimes', Rule::in(['kas_keluar', 'kas_masuk'])],
             'kategori' => ['required', 'string', 'max:255'],
+            'komoditas' => ['nullable', 'required_if:tipe,kas_masuk', 'string', 'max:255'],
             'nominal' => ['required', 'numeric', 'gt:0'],
             'tanggal' => ['required', 'date'],
             'lahan_id' => [

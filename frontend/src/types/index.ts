@@ -42,13 +42,14 @@ export interface Aktivitas {
   updated_at: string | null;
 }
 
-export type TransaksiTipe = 'kas_keluar';
+export type TransaksiTipe = 'kas_keluar' | 'kas_masuk';
 
 export interface Transaksi {
   id: number | null;
   client_uuid: string;
   tipe: TransaksiTipe;
   kategori: string;
+  komoditas: string | null;
   nominal: string;
   tanggal: string;
   lahan_id: number | string | null;
@@ -59,7 +60,14 @@ export interface Transaksi {
 
 export interface TransaksiMeta {
   total_kas_keluar: string;
+  total_kas_masuk: string;
   saldo: string;
+}
+
+export interface RingkasanKomoditas {
+  komoditas: string;
+  total: number;
+  jumlah_transaksi: number;
 }
 
 // Bentuk respons API

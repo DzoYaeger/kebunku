@@ -38,6 +38,7 @@ export interface TransaksiLocal {
   server_id: number | null;
   tipe: TransaksiTipe;
   kategori: string;
+  komoditas: string | null;
   nominal: string;
   tanggal: string;
   lahan_uuid: string | null;
@@ -72,10 +73,10 @@ class KebunkuDB extends Dexie {
 
   constructor() {
     super('kebunku');
-    this.version(1).stores({
+    this.version(2).stores({
       lahan: 'client_uuid, server_id, status, _dirty',
       aktivitas: 'client_uuid, server_id, lahan_uuid, tanggal, _dirty',
-      transaksi: 'client_uuid, server_id, tanggal, _dirty',
+      transaksi: 'client_uuid, server_id, tipe, tanggal, _dirty',
       sync_queue: '++id, entity, op, client_uuid, status, created_at',
     });
   }

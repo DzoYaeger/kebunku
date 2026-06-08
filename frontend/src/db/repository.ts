@@ -189,12 +189,13 @@ export const aktivitasRepo = {
 /* --------------------------- TRANSAKSI --------------------------- */
 
 export interface TransaksiInput {
+  tipe?: TransaksiTipe;
   kategori: string;
+  komoditas?: string | null;
   nominal: string;
   tanggal: string;
   lahan_uuid?: string | null;
   catatan?: string | null;
-  tipe?: TransaksiTipe;
 }
 
 export const transaksiRepo = {
@@ -203,13 +204,30 @@ export const transaksiRepo = {
     return rows.sort((a, b) => b.tanggal.localeCompare(a.tanggal) || b.created_at.localeCompare(a.created_at));
   },
 
-  // Saldo lokal = 0 - total kas keluar (cermin agregasi server).
-  async saldo(): Promise<{ total_kas_keluar: number; saldo: number }> {
+  async saldo(): Promise<{ total_kas_keluar: number; total_kas_masuk: number; saldo: number }> {
     const rows = await db.transaksi.toArray();
-    const total = rows
+    const totalKeluar = rows
       .filter((r) => r.tipe === 'kas_keluar')
       .reduce((sum, r) => sum + Number(r.nominal), 0);
-    return { total_kas_keluar: total, saldo: 0 - total };
+    const totalMasuk = rows
+      .filter((r) => r.tipe === 'kas_masuk')
+      .reduce((sum, r) => sum + Number(r.nominal), 0);
+    return { total_kas_keluar: totalKeluar, total_kas_masuk: totalMasuk, saldo: totalMasuk - totalKeluar };
+  },
+
+  async ringkasanKomoditas(): Promise<{ komoditas: string; total: number; jumlah: number }[]> {
+    const rows = await db.transaksi.where('tipe').equals('kas_masuk').toArray();
+    const map = new Map<string, { total: number; jumlah: number }>();
+    for (const r of rows) {
+      if (!r.komoditas) continue;
+      const existing = map.get(r.komoditas) ?? { total: 0, jumlah: 0 };
+      existing.total += Number(r.nominal);
+      existing.jumlah += 1;
+      map.set(r.komoditas, existing);
+    }
+    return [...map.entries()]
+      .map(([komoditas, v]) => ({ komoditas, total: v.total, jumlah: v.jumlah }))
+      .sort((a, b) => b.total - a.total);
   },
 
   async create(input: TransaksiInput): Promise<TransaksiLocal> {
@@ -220,6 +238,7 @@ export const transaksiRepo = {
       server_id: null,
       tipe: input.tipe ?? 'kas_keluar',
       kategori: input.kategori,
+      komoditas: input.komoditas ?? null,
       nominal: input.nominal,
       tanggal: input.tanggal,
       lahan_uuid: input.lahan_uuid ?? null,
@@ -234,6 +253,7 @@ export const transaksiRepo = {
       client_uuid: record.client_uuid,
       tipe: record.tipe,
       kategori: record.kategori,
+      komoditas: record.komoditas,
       nominal: record.nominal,
       tanggal: record.tanggal,
       lahan_uuid: record.lahan_uuid,
