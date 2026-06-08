@@ -3,6 +3,11 @@
         Options -MultiViews -Indexes
     </IfModule>
 
+    # ── Prioritaskan index.html (frontend SPA) sebagai halaman utama ──
+    <IfModule mod_dir.c>
+        DirectoryIndex index.html index.php
+    </IfModule>
+
     RewriteEngine On
 
     # ── Teruskan header Authorization (wajib untuk token Sanctum Bearer) ──
