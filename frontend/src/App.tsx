@@ -53,15 +53,15 @@ function MainTabs(): React.JSX.Element {
           <IonIcon aria-hidden="true" className="icon-active" icon={leaf} />
           <IonLabel>Tanaman</IonLabel>
         </IonTabButton>
-        <IonTabButton tab="aktivitas" href="/app/aktivitas">
-          <IonIcon aria-hidden="true" className="icon-inactive" icon={documentTextOutline} />
-          <IonIcon aria-hidden="true" className="icon-active" icon={documentText} />
-          <IonLabel>Aktivitas</IonLabel>
-        </IonTabButton>
         <IonTabButton tab="keuangan" href="/app/keuangan">
           <IonIcon aria-hidden="true" className="icon-inactive" icon={walletOutline} />
           <IonIcon aria-hidden="true" className="icon-active" icon={wallet} />
           <IonLabel>Keuangan</IonLabel>
+        </IonTabButton>
+        <IonTabButton tab="aktivitas" href="/app/aktivitas">
+          <IonIcon aria-hidden="true" className="icon-inactive" icon={documentTextOutline} />
+          <IonIcon aria-hidden="true" className="icon-active" icon={documentText} />
+          <IonLabel>Aktivitas</IonLabel>
         </IonTabButton>
       </IonTabBar>
     </IonTabs>

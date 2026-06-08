@@ -6,11 +6,7 @@ import {
   IonTitle,
   IonButtons,
   IonContent,
-  IonFab,
-  IonFabButton,
   IonIcon,
-  IonToast,
-  IonAlert,
   IonSegment,
   IonSegmentButton,
   IonLabel,
@@ -19,62 +15,137 @@ import {
   useIonViewWillEnter,
 } from '@ionic/react';
 import {
-  add,
-  documentTextOutline,
-  calendarOutline,
+  timeOutline,
   leafOutline,
   swapHorizontalOutline,
   flaskOutline,
   bugOutline,
+  cashOutline,
+  cartOutline,
+  calendarOutline,
+  documentTextOutline,
+  cloudUploadOutline,
 } from 'ionicons/icons';
-import type { AktivitasLocal, LahanLocal } from '../../db';
-import type { AktivitasTipe } from '../../types';
-import { aktivitasRepo, lahanRepo, type AktivitasInput } from '../../db/repository';
-import { runSync } from '../../sync/SyncEngine';
+import type { AktivitasLocal, TransaksiLocal, LahanLocal } from '../../db';
+import { aktivitasRepo, transaksiRepo, lahanRepo } from '../../db/repository';
 import { hydrateFromServer } from '../../sync/hydrate';
 import { useSyncStore } from '../../store/syncStore';
 import { SyncIndicator } from '../../components/SyncIndicator';
 import { AccountButton } from '../../components/AccountButton';
 import { EmptyState } from '../../components/EmptyState';
 import { CardSkeleton } from '../../components/CardSkeleton';
-import { AktivitasItem } from './AktivitasItem';
-import { AktivitasFormModal } from './AktivitasFormModal';
+import { formatRupiah, formatTanggal } from '../../utils/format';
 
-const OFFLINE_MSG = 'Disimpan secara lokal (Mode Offline)';
-type Filter = 'semua' | AktivitasTipe;
+type Filter = 'semua' | 'tanaman' | 'keuangan';
+
+interface TimelineItem {
+  id: string;
+  source: 'tanaman' | 'keuangan';
+  tanggal: string;
+  created_at: string;
+  icon: string;
+  iconBg: string;
+  iconColor: string;
+  title: string;
+  subtitle: string;
+  badge?: string;
+  badgeBg?: string;
+  badgeColor?: string;
+  dirty: boolean;
+}
+
+function buildTimeline(
+  aktivitas: AktivitasLocal[],
+  transaksi: TransaksiLocal[],
+  lahanMap: Map<string, LahanLocal>,
+): TimelineItem[] {
+  const items: TimelineItem[] = [];
+
+  const TIPE_META: Record<string, { icon: string; bg: string; fg: string; label: string }> = {
+    semai: { icon: leafOutline, bg: '#FEF3C7', fg: '#B45309', label: 'Semai' },
+    pindah_tanam: { icon: swapHorizontalOutline, bg: '#DCFCE7', fg: '#15803D', label: 'Pindah Tanam' },
+    pemupukan: { icon: flaskOutline, bg: '#E0F2FE', fg: '#0369A1', label: 'Pemupukan' },
+    pestisida: { icon: bugOutline, bg: '#FFE4E6', fg: '#BE123C', label: 'Pestisida' },
+  };
+
+  for (const a of aktivitas) {
+    const meta = TIPE_META[a.tipe] ?? TIPE_META.semai;
+    const lahan = lahanMap.get(a.lahan_uuid);
+    const bahan = a.jenis_pupuk ?? a.jenis_pestisida;
+    items.push({
+      id: `a-${a.client_uuid}`,
+      source: 'tanaman',
+      tanggal: a.tanggal,
+      created_at: a.created_at,
+      icon: meta.icon,
+      iconBg: meta.bg,
+      iconColor: meta.fg,
+      title: meta.label,
+      subtitle: [lahan ? `${lahan.komoditas} · Bed ${lahan.nomor_bed}` : '', bahan, a.catatan]
+        .filter(Boolean).join(' · '),
+      badge: meta.label,
+      badgeBg: meta.bg,
+      badgeColor: meta.fg,
+      dirty: a._dirty === 1,
+    });
+  }
+
+  for (const t of transaksi) {
+    const isMasuk = t.tipe === 'kas_masuk';
+    items.push({
+      id: `t-${t.client_uuid}`,
+      source: 'keuangan',
+      tanggal: t.tanggal,
+      created_at: t.created_at,
+      icon: isMasuk ? cashOutline : cartOutline,
+      iconBg: isMasuk ? '#DCFCE7' : '#FFE4E6',
+      iconColor: isMasuk ? '#15803D' : '#BE123C',
+      title: isMasuk
+        ? `Pemasukan · ${t.komoditas ?? t.kategori}`
+        : `Pengeluaran · ${t.kategori}`,
+      subtitle: [
+        `${isMasuk ? '+' : '-'}${formatRupiah(t.nominal)}`,
+        t.catatan,
+      ].filter(Boolean).join(' · '),
+      badge: isMasuk ? 'Kas Masuk' : 'Kas Keluar',
+      badgeBg: isMasuk ? '#DCFCE7' : '#FFE4E6',
+      badgeColor: isMasuk ? '#15803D' : '#BE123C',
+      dirty: t._dirty === 1,
+    });
+  }
+
+  items.sort((a, b) => b.tanggal.localeCompare(a.tanggal) || b.created_at.localeCompare(a.created_at));
+  return items;
+}
 
 interface DateGroup {
   date: string;
   label: string;
-  items: AktivitasLocal[];
+  items: TimelineItem[];
 }
 
 function formatDateLabel(dateStr: string): string {
-  const d = new Date(dateStr);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  if (dateStr === today.toISOString().slice(0, 10)) return 'Hari Ini';
-  if (dateStr === yesterday.toISOString().slice(0, 10)) return 'Kemarin';
-  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  if (dateStr === today) return 'Hari Ini';
+  if (dateStr === yesterday) return 'Kemarin';
+  return new Date(dateStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export default function AktivitasListPage(): React.JSX.Element {
-  const [items, setItems] = useState<AktivitasLocal[]>([]);
-  const [lahanMap, setLahanMap] = useState<Map<string, LahanLocal>>(new Map());
-  const [lahanOptions, setLahanOptions] = useState<LahanLocal[]>([]);
+  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('semua');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-  const [toDelete, setToDelete] = useState<AktivitasLocal | null>(null);
-  const refreshCounts = useSyncStore((s) => s.refreshCounts);
+  useSyncStore((s) => s.pendingCount); // re-render saat sync berubah
 
   const reload = useCallback(async (): Promise<void> => {
-    const [aktivitas, lahan] = await Promise.all([aktivitasRepo.list(), lahanRepo.list()]);
-    setItems(aktivitas);
-    setLahanOptions(lahan);
-    setLahanMap(new Map(lahan.map((l) => [l.client_uuid, l])));
+    const [aktivitas, transaksi, lahan] = await Promise.all([
+      aktivitasRepo.list(),
+      transaksiRepo.list(),
+      lahanRepo.list(),
+    ]);
+    const lahanMap = new Map(lahan.map((l) => [l.client_uuid, l]));
+    setTimeline(buildTimeline(aktivitas, transaksi, lahanMap));
   }, []);
 
   const sync = useCallback(async (): Promise<void> => {
@@ -82,7 +153,7 @@ export default function AktivitasListPage(): React.JSX.Element {
     try {
       await hydrateFromServer();
       await reload();
-    } catch {/* pakai data lokal */}
+    } catch {/* data lokal */}
   }, [reload]);
 
   useIonViewWillEnter(() => {
@@ -93,51 +164,23 @@ export default function AktivitasListPage(): React.JSX.Element {
     })();
   });
 
-  const filtered = useMemo(
-    () => (filter === 'semua' ? items : items.filter((a) => a.tipe === filter)),
-    [items, filter],
-  );
+  const filtered = useMemo(() => {
+    if (filter === 'semua') return timeline;
+    return timeline.filter((t) => t.source === filter);
+  }, [timeline, filter]);
 
-  // Group by date
   const dateGroups = useMemo<DateGroup[]>(() => {
-    const map = new Map<string, AktivitasLocal[]>();
-    for (const a of filtered) {
-      const date = a.tanggal.slice(0, 10);
+    const map = new Map<string, TimelineItem[]>();
+    for (const item of filtered) {
+      const date = item.tanggal.slice(0, 10);
       const arr = map.get(date) ?? [];
-      arr.push(a);
+      arr.push(item);
       map.set(date, arr);
     }
     return [...map.entries()]
       .sort((a, b) => b[0].localeCompare(a[0]))
-      .map(([date, groupItems]) => ({ date, label: formatDateLabel(date), items: groupItems }));
+      .map(([date, items]) => ({ date, label: formatDateLabel(date), items }));
   }, [filtered]);
-
-  // Stats
-  const stats = useMemo(() => {
-    const semai = items.filter((a) => a.tipe === 'semai').length;
-    const pindah = items.filter((a) => a.tipe === 'pindah_tanam').length;
-    const pupuk = items.filter((a) => a.tipe === 'pemupukan').length;
-    const pesti = items.filter((a) => a.tipe === 'pestisida').length;
-    return { total: items.length, semai, pindah, pupuk, pesti };
-  }, [items]);
-
-  const handleSubmit = async (input: AktivitasInput): Promise<void> => {
-    await aktivitasRepo.create(input);
-    await reload();
-    await refreshCounts();
-    if (navigator.onLine) void runSync().then(reload);
-    else setToast(OFFLINE_MSG);
-  };
-
-  const confirmDelete = async (): Promise<void> => {
-    if (!toDelete) return;
-    await aktivitasRepo.remove(toDelete.client_uuid);
-    setToDelete(null);
-    await reload();
-    await refreshCounts();
-    if (navigator.onLine) void runSync().then(reload);
-    else setToast(OFFLINE_MSG);
-  };
 
   return (
     <IonPage>
@@ -156,90 +199,78 @@ export default function AktivitasListPage(): React.JSX.Element {
 
         <div className="px-4 pb-24 pt-2">
           {loading ? (
-            <CardSkeleton count={5} hero />
+            <CardSkeleton count={6} />
           ) : (
             <>
-              {/* ═══ HERO STATS ═══ */}
-              {items.length > 0 && (
+              {/* Hero */}
+              {timeline.length > 0 && (
                 <div className="kbn-hero kbn-fade-up p-5 mb-5">
                   <div className="relative z-10">
                     <div className="flex items-center gap-1.5 text-white/70">
-                      <IonIcon icon={calendarOutline} className="text-base" />
-                      <span className="text-[0.75rem] font-semibold tracking-wide uppercase">Catatan Aktivitas</span>
+                      <IonIcon icon={timeOutline} className="text-base" />
+                      <span className="text-[0.75rem] font-semibold tracking-wide uppercase">Riwayat</span>
                     </div>
                     <p className="text-[2rem] font-extrabold mt-1 leading-none">
-                      {stats.total} <span className="text-[1rem] font-semibold text-white/70">aktivitas</span>
+                      {timeline.length} <span className="text-[1rem] font-semibold text-white/70">kegiatan</span>
                     </p>
-                    <div className="grid grid-cols-4 gap-1.5 mt-4 pt-3.5 border-t border-white/15">
-                      <div className="text-center">
-                        <div className="w-7 h-7 rounded-lg bg-[#FEF3C7]/20 flex items-center justify-center mx-auto mb-1">
-                          <IonIcon icon={leafOutline} className="text-[#FCD34D] text-sm" />
+                    <div className="grid grid-cols-2 gap-3 mt-4 pt-3.5 border-t border-white/15">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center">
+                          <IonIcon icon={leafOutline} className="text-[#86efac] text-lg" />
                         </div>
-                        <p className="text-[0.9rem] font-bold">{stats.semai}</p>
-                        <p className="text-[0.55rem] text-white/60">Semai</p>
+                        <div>
+                          <p className="text-[0.6rem] text-white/60 leading-none font-medium">Tanaman</p>
+                          <p className="text-[0.9rem] font-bold mt-0.5">
+                            {timeline.filter((t) => t.source === 'tanaman').length}
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-center">
-                        <div className="w-7 h-7 rounded-lg bg-[#86efac]/20 flex items-center justify-center mx-auto mb-1">
-                          <IonIcon icon={swapHorizontalOutline} className="text-[#86efac] text-sm" />
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center">
+                          <IonIcon icon={cashOutline} className="text-[#fcd34d] text-lg" />
                         </div>
-                        <p className="text-[0.9rem] font-bold">{stats.pindah}</p>
-                        <p className="text-[0.55rem] text-white/60">Pindah</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="w-7 h-7 rounded-lg bg-[#BAE6FD]/20 flex items-center justify-center mx-auto mb-1">
-                          <IonIcon icon={flaskOutline} className="text-[#7dd3fc] text-sm" />
+                        <div>
+                          <p className="text-[0.6rem] text-white/60 leading-none font-medium">Keuangan</p>
+                          <p className="text-[0.9rem] font-bold mt-0.5">
+                            {timeline.filter((t) => t.source === 'keuangan').length}
+                          </p>
                         </div>
-                        <p className="text-[0.9rem] font-bold">{stats.pupuk}</p>
-                        <p className="text-[0.55rem] text-white/60">Pupuk</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="w-7 h-7 rounded-lg bg-[#FECDD3]/20 flex items-center justify-center mx-auto mb-1">
-                          <IonIcon icon={bugOutline} className="text-[#fca5a5] text-sm" />
-                        </div>
-                        <p className="text-[0.9rem] font-bold">{stats.pesti}</p>
-                        <p className="text-[0.55rem] text-white/60">Pestisida</p>
                       </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* ═══ FILTER ═══ */}
-              {items.length > 0 && (
+              {/* Filter */}
+              {timeline.length > 0 && (
                 <div className="mb-4 kbn-fade-up" style={{ animationDelay: '0.06s' }}>
                   <IonSegment
                     className="kbn-segment"
                     value={filter}
                     onIonChange={(e) => setFilter((e.detail.value as Filter) ?? 'semua')}
-                    scrollable
                   >
                     <IonSegmentButton value="semua"><IonLabel>Semua</IonLabel></IonSegmentButton>
-                    <IonSegmentButton value="semai"><IonLabel>Semai</IonLabel></IonSegmentButton>
-                    <IonSegmentButton value="pindah_tanam"><IonLabel>Pindah</IonLabel></IonSegmentButton>
-                    <IonSegmentButton value="pemupukan"><IonLabel>Pupuk</IonLabel></IonSegmentButton>
-                    <IonSegmentButton value="pestisida"><IonLabel>Pestisida</IonLabel></IonSegmentButton>
+                    <IonSegmentButton value="tanaman"><IonLabel>Tanaman</IonLabel></IonSegmentButton>
+                    <IonSegmentButton value="keuangan"><IonLabel>Keuangan</IonLabel></IonSegmentButton>
                   </IonSegment>
                 </div>
               )}
 
-              {/* ═══ TIMELINE LIST ═══ */}
-              {items.length === 0 ? (
+              {/* Timeline */}
+              {timeline.length === 0 ? (
                 <EmptyState
                   icon={documentTextOutline}
-                  title="Belum ada aktivitas"
-                  subtitle="Catat semai, pindah tanam, atau pemupukan pada lahan Anda."
-                  actionLabel="Catat Aktivitas"
-                  onAction={() => setModalOpen(true)}
+                  title="Belum ada riwayat"
+                  subtitle="Riwayat akan otomatis muncul saat Anda mencatat aktivitas di Tanaman atau Keuangan."
                 />
               ) : filtered.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-body text-slate-muted">Tidak ada aktivitas tipe ini.</p>
+                  <p className="text-body text-slate-muted">Tidak ada riwayat untuk kategori ini.</p>
                 </div>
               ) : (
                 <div className="kbn-fade-up" style={{ animationDelay: '0.1s' }}>
                   {dateGroups.map((group) => (
                     <div key={group.date} className="mb-5">
-                      {/* Date header */}
                       <div className="flex items-center gap-2 mb-2.5">
                         <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center">
                           <IonIcon icon={calendarOutline} className="text-slate-muted text-xs" />
@@ -248,15 +279,43 @@ export default function AktivitasListPage(): React.JSX.Element {
                         <span className="text-[0.65rem] text-slate-muted">· {group.items.length}</span>
                         <div className="flex-1 h-px bg-slate-100 ml-2" />
                       </div>
-                      {/* Items with timeline line */}
                       <div className="pl-3 border-l-2 border-slate-100 ml-[11px] space-y-0">
-                        {group.items.map((a) => (
-                          <AktivitasItem
-                            key={a.client_uuid}
-                            aktivitas={a}
-                            lahan={lahanMap.get(a.lahan_uuid)}
-                            onDelete={setToDelete}
-                          />
+                        {group.items.map((item) => (
+                          <div key={item.id} className="relative flex items-start gap-3 mb-2.5 pl-3">
+                            <div
+                              className="absolute -left-[9px] top-4 w-4 h-4 rounded-full border-[3px] border-white shadow-sm z-10"
+                              style={{ background: item.iconColor }}
+                            />
+                            <div className="kbn-card w-full p-3.5 flex items-center gap-3">
+                              <div
+                                className="kbn-avatar !w-10 !h-10 !rounded-xl"
+                                style={{ background: item.iconBg, color: item.iconColor }}
+                              >
+                                <IonIcon icon={item.icon} className="text-lg" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[0.84rem] font-bold text-slate-dark truncate">
+                                    {item.title}
+                                  </span>
+                                  {item.dirty && (
+                                    <IonIcon icon={cloudUploadOutline} className="text-slate-muted text-[0.65rem] shrink-0" />
+                                  )}
+                                </div>
+                                <p className="text-[0.7rem] text-slate-muted mt-0.5 truncate">
+                                  {item.subtitle || formatTanggal(item.tanggal)}
+                                </p>
+                              </div>
+                              {item.badge && (
+                                <span
+                                  className="text-[0.6rem] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
+                                  style={{ background: item.badgeBg, color: item.badgeColor }}
+                                >
+                                  {item.badge}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -266,37 +325,6 @@ export default function AktivitasListPage(): React.JSX.Element {
             </>
           )}
         </div>
-
-        <IonFab slot="fixed" vertical="bottom" horizontal="end">
-          <IonFabButton onClick={() => setModalOpen(true)}>
-            <IonIcon icon={add} />
-          </IonFabButton>
-        </IonFab>
-
-        <AktivitasFormModal
-          isOpen={modalOpen}
-          lahanOptions={lahanOptions}
-          onClose={() => setModalOpen(false)}
-          onSubmit={handleSubmit}
-        />
-
-        <IonAlert
-          isOpen={toDelete !== null}
-          header="Hapus aktivitas?"
-          buttons={[
-            { text: 'Batal', role: 'cancel', handler: () => setToDelete(null) },
-            { text: 'Hapus', role: 'destructive', handler: () => void confirmDelete() },
-          ]}
-          onDidDismiss={() => setToDelete(null)}
-        />
-
-        <IonToast
-          isOpen={toast !== null}
-          message={toast ?? ''}
-          duration={2000}
-          onDidDismiss={() => setToast(null)}
-          color="medium"
-        />
       </IonContent>
     </IonPage>
   );

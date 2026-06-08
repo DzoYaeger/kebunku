@@ -30,7 +30,7 @@ export default function Login(): React.JSX.Element {
       router.push('/app/tanaman', 'root', 'replace');
     } catch (err) {
       if (isValidationError(err)) {
-        setError('Email atau password salah.');
+        setError('Username atau password salah.');
       } else {
         setError('Gagal masuk. Periksa koneksi Anda.');
       }
@@ -57,9 +57,10 @@ export default function Login(): React.JSX.Element {
             <div className="kbn-card p-5">
               <form onSubmit={submit} className="space-y-4">
                 <IonInput
-                  label="Email"
+                  label="Username"
                   labelPlacement="stacked"
-                  type="email"
+                  type="text"
+                  autocapitalize="off"
                   fill="outline"
                   value={email}
                   onIonInput={(e) => setEmail(e.detail.value ?? '')}
