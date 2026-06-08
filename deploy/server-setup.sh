@@ -40,22 +40,29 @@ php artisan config:cache
 php artisan route:cache
 chmod -R 775 storage bootstrap/cache
 
-echo "==> 6/6 Build & deploy frontend ke public_html"
+echo "==> 6/6 Deploy frontend ke public_html"
 cd "$SRC/frontend"
+DIST=""
 if command -v npm >/dev/null 2>&1; then
+  echo "    npm tersedia — build di server."
   npm ci
   npm run build
+  DIST="$SRC/frontend/dist"
+elif [ -d "$SRC/frontend/dist" ]; then
+  echo "    npm tidak ada — pakai dist pra-build dari repo."
+  DIST="$SRC/frontend/dist"
+fi
+
+if [ -n "$DIST" ] && [ -d "$DIST" ]; then
   mkdir -p "$PUBLIC"
-  # Bersihkan aset lama (hati-hati: hanya isi yang di-generate)
   rm -rf "$PUBLIC/assets"
-  cp -r dist/* "$PUBLIC/"
+  cp -r "$DIST"/* "$PUBLIC/"
   cp "$SRC/deploy/public_html/index.php" "$PUBLIC/index.php"
   cp "$SRC/deploy/public_html/.htaccess" "$PUBLIC/.htaccess"
-  echo "==> Frontend ter-deploy."
+  echo "==> Frontend ter-deploy ke $PUBLIC"
 else
-  echo "!! npm tidak tersedia di server."
-  echo "   Build 'frontend' di lokal (npm run build), lalu upload isi dist/ + "
-  echo "   deploy/public_html/index.php & .htaccess ke: $PUBLIC"
+  echo "!! Tidak ada npm & tidak ada dist di repo."
+  echo "   Build 'frontend' di lokal lalu upload isi dist/ + deploy/public_html/* ke: $PUBLIC"
 fi
 
 echo ""
