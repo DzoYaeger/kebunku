@@ -10,7 +10,7 @@ interface AuthState {
   // 'unknown' = belum dicek; 'authenticated' / 'guest' setelah cek.
   status: 'unknown' | 'authenticated' | 'guest';
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (login: string, password: string) => Promise<void>;
   register: (
     name: string,
     email: string,
@@ -19,6 +19,8 @@ interface AuthState {
   ) => Promise<void>;
   logout: () => Promise<void>;
   loadMe: () => Promise<void>;
+  updateProfile: (name: string, username: string, email: string) => Promise<void>;
+  updatePassword: (currentPassword: string, password: string, passwordConfirmation: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -27,10 +29,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   status: 'unknown',
   loading: false,
 
-  login: async (email, password) => {
+  login: async (login, password) => {
     set({ loading: true });
     try {
-      const res = await api.post<ApiResource<AuthPayload>>('/auth/login', { email, password });
+      const res = await api.post<ApiResource<AuthPayload>>('/auth/login', { login, password });
       setToken(res.data.data.token);
       set({
         user: res.data.data.user,
@@ -91,5 +93,22 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ status: 'guest' });
       }
     }
+  },
+
+  updateProfile: async (name, username, email) => {
+    const res = await api.put<ApiResource<User>>('/auth/profile', {
+      name,
+      username: username || null,
+      email,
+    });
+    set({ user: res.data.data });
+  },
+
+  updatePassword: async (currentPassword, password, passwordConfirmation) => {
+    await api.put('/auth/password', {
+      current_password: currentPassword,
+      password,
+      password_confirmation: passwordConfirmation,
+    });
   },
 }));

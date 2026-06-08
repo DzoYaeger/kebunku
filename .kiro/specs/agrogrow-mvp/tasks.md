@@ -96,3 +96,108 @@ Rencana eksekusi bertahap. Tiap task incremental, dapat diuji, dan mereferensika
 - Gunakan command registry di `.kiro/steering/tech.md`; jangan jalankan perintah eksperimental.
 - Trigger otomasi: `@gen-api [Fitur]` untuk task backend, `@gen-page [Halaman]` untuk task frontend.
 - Patuhi `backend-standards.md`, `frontend-standards.md`, dan `design-system.md` pada setiap task.
+
+---
+
+## Fase 7 — Perawatan & Cuaca (AI)
+- [x] 15. Backend: endpoint Perawatan (riwayat pupuk/pestisida per lahan)
+  - `PerawatanController@index` — aggregasi aktivitas tipe pemupukan/pestisida per lahan.
+  - `PerawatanResource` — output: terakhir dipupuk/dipestisida, riwayat lengkap.
+  - `PerawatanController@saranAi` — kirim data ke Groq AI, kembalikan saran.
+  - _Requirements: Modul Perawatan_
+
+- [x] 16. Backend: endpoint Cuaca & Saran Harian
+  - `CuacaController@index` — ambil prakiraan cuaca via Open-Meteo (gratis, default Palopo).
+  - `CuacaController@saranHarian` — AI analisis cuaca + data tanaman aktif, beri saran harian.
+  - _Requirements: AI Integration_
+
+- [x] 17. Frontend: halaman Perawatan
+  - UI expandable cards, urgency badges (hijau/kuning/merah), summary bar, riwayat timeline.
+  - Tombol "Minta Saran AI" per tanaman.
+  - Tab Perawatan di bottom nav (ikon medkit).
+  - _Requirements: Modul Perawatan_
+
+- [x] 18. Frontend: widget Cuaca & Saran AI di halaman Tanaman
+  - Widget cuaca (suhu, kelembaban, prediksi hujan) di bawah hero stats.
+  - Saran AI harian expandable.
+  - _Requirements: AI Integration_
+
+## Fase 8 — Settings & Profil
+- [x] 19. Backend: update profil (username, nama, email, password)
+  - Tambah kolom `username` ke tabel users (unique, nullable).
+  - Endpoint `PUT /api/auth/profile` — update name, email, username.
+  - Endpoint `PUT /api/auth/password` — update password (validasi old password).
+  - _Requirements: Settings_
+
+- [x] 20. Backend: login via username ATAU email
+  - Update `LoginRequest` dan `AuthController@login` — terima field `login` yang bisa email atau username.
+  - Feature test: login email, login username, username salah → 401.
+  - _Requirements: R1 Extension_
+
+- [x] 21. Frontend: halaman Settings
+  - Tab/page Settings — menu: Edit Profil, Pengaturan Lokasi.
+  - Edit Profil: form ubah username, nama, email, password.
+  - _Requirements: Settings_
+
+- [x] 22. Frontend & Backend: Pengaturan Lokasi
+  - Saat ditekan, minta izin GPS (`navigator.geolocation`).
+  - Atau input manual nama kota → geocode ke lat/lon (Open-Meteo geocoding API).
+  - Simpan lokasi di `localStorage` dan kirim sebagai param ke `/api/cuaca`.
+  - _Requirements: Lokasi Cuaca_
+
+## Fase 9 — Halaman Tanaman: Ganti Hero dengan Saran AI
+- [x] 23. Frontend: replace hero stats dengan card Saran AI Harian
+  - Hapus hero stats lama, ganti dengan card cuaca + saran AI yang lebih prominent.
+  - Saran AI sebagai konten utama di atas list tanaman.
+  - _Requirements: UX Improvement_
+
+## Fase 10 — Perawatan: Sistem Grouping
+- [x] 24. Frontend: grouping di halaman Perawatan
+  - Group tanaman berdasarkan komoditas (mirip LahanListPage).
+  - Collapsible per grup dengan jumlah tanaman.
+  - _Requirements: UX Improvement_
+
+## Fase 11 — Chat AI (Modul Baru)
+- [x] 25. Backend: migration & model ChatSession + ChatMessage
+  - Tabel `chat_sessions` (id, user_id, judul, lahan_id nullable, timestamps).
+  - Tabel `chat_messages` (id, session_id, role enum(user/assistant), content text, image_path nullable, timestamps).
+  - _Requirements: Chat AI_
+
+- [x] 26. Backend: endpoint Chat AI
+  - `POST /api/chat/sessions` — buat sesi baru (opsional pilih lahan).
+  - `GET /api/chat/sessions` — list sesi user.
+  - `GET /api/chat/sessions/{id}/messages` — riwayat chat sesi.
+  - `POST /api/chat/sessions/{id}/messages` — kirim pesan (teks + opsional gambar), panggil Groq AI dengan konteks riwayat + data tanaman, kembalikan respons AI.
+  - Upload gambar via multipart form-data, simpan di storage.
+  - _Requirements: Chat AI_
+
+- [x] 27. Frontend: halaman Chat AI
+  - Ikon tab di tengah bottom nav, bulat & timbul (raised center button) untuk kesan profesional.
+  - List sesi chat + tombol "Chat Baru".
+  - Halaman chat: bubble messages, input teks + tombol kamera/galeri.
+  - Pilih tanaman yang dikonsultasikan (select lahan) di awal sesi atau saat chat.
+  - Riwayat chat tersimpan, bisa lanjutkan sesi sebelumnya.
+  - _Requirements: Chat AI_
+
+- [x] 28. Frontend: upload/foto gambar di chat
+  - Tombol attach: pilih dari galeri atau ambil foto langsung (Capacitor Camera / input file).
+  - Preview gambar sebelum kirim.
+  - Tampilkan gambar di bubble chat.
+  - _Requirements: Chat AI_
+
+## Fase 12 — UI/UX Chat AI (Sesuai Feedback User)
+- [ ] 29. Frontend: sesuaikan tab bar saat di halaman Chat
+  - Ukuran tab bar disesuaikan agar tidak mengganggu input teks.
+  - _Requirements: UX Improvement_
+
+- [ ] 30. Frontend: pindahkan selector tanaman ke dalam textarea (inline)
+  - Icon @ di dalam textarea.
+  - Saat diklik, modal selector muncul di bawah textarea (bukan di atas).
+  - Pilih lebih dari 1 tanaman (checkbox list).
+  - _Requirements: UX Improvement_
+
+- [ ] 31. Frontend: buat checkbox tanaman lebih jelas
+  - Ukuran checkbox lebih besar.
+  - Warna/visual feedback lebih kontras.
+  - _Requirements: UX Improvement_
+

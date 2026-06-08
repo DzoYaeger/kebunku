@@ -12,9 +12,10 @@ class DatabaseSeeder extends Seeder
     {
         // Akun tunggal untuk login.
         User::updateOrCreate(
-            ['email' => 'yaeger'],
+            ['email' => 'yaeger@kebunku.app'],
             [
-                'name' => 'yaeger',
+                'name' => 'Yaeger',
+                'username' => 'yaeger',
                 'password' => Hash::make('se7encyber'),
             ],
         );

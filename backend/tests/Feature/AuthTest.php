@@ -48,12 +48,29 @@ class AuthTest extends TestCase
         ]);
 
         $response = $this->postJson('/api/auth/login', [
-            'email' => 'login@example.com',
+            'login' => 'login@example.com',
             'password' => 'rahasia123',
         ]);
 
         $response->assertOk()
             ->assertJsonStructure(['data' => ['user' => ['id', 'email'], 'token']]);
+    }
+
+    public function test_login_via_username(): void
+    {
+        User::factory()->create([
+            'username' => 'petani01',
+            'email' => 'petani01@example.com',
+            'password' => Hash::make('rahasia123'),
+        ]);
+
+        $response = $this->postJson('/api/auth/login', [
+            'login' => 'petani01',
+            'password' => 'rahasia123',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.user.username', 'petani01');
     }
 
     public function test_login_kredensial_salah_401(): void
@@ -64,11 +81,57 @@ class AuthTest extends TestCase
         ]);
 
         $response = $this->postJson('/api/auth/login', [
-            'email' => 'login@example.com',
+            'login' => 'login@example.com',
             'password' => 'salah',
         ]);
 
         $response->assertStatus(401);
+    }
+
+    public function test_update_profil(): void
+    {
+        $user = User::factory()->create(['name' => 'Lama', 'email' => 'lama@example.com']);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/auth/profile', [
+                'name' => 'Baru',
+                'username' => 'barujaya',
+                'email' => 'baru@example.com',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Baru')
+            ->assertJsonPath('data.username', 'barujaya');
+
+        $this->assertDatabaseHas('users', ['id' => $user->id, 'email' => 'baru@example.com', 'username' => 'barujaya']);
+    }
+
+    public function test_update_password_dengan_current_benar(): void
+    {
+        $user = User::factory()->create(['password' => Hash::make('lama12345')]);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/auth/password', [
+                'current_password' => 'lama12345',
+                'password' => 'baru12345',
+                'password_confirmation' => 'baru12345',
+            ])
+            ->assertOk();
+
+        $this->assertTrue(Hash::check('baru12345', $user->fresh()->password));
+    }
+
+    public function test_update_password_current_salah_ditolak(): void
+    {
+        $user = User::factory()->create(['password' => Hash::make('lama12345')]);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/auth/password', [
+                'current_password' => 'salah',
+                'password' => 'baru12345',
+                'password_confirmation' => 'baru12345',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('current_password');
     }
 
     public function test_endpoint_terproteksi_tanpa_token_401(): void

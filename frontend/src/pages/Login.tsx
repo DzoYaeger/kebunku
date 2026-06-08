@@ -18,7 +18,7 @@ export default function Login(): React.JSX.Element {
   const loading = useAuthStore((s) => s.loading);
   const router = useIonRouter();
 
-  const [email, setEmail] = useState('');
+  const [loginValue, setLoginValue] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -26,11 +26,11 @@ export default function Login(): React.JSX.Element {
     e.preventDefault();
     setError(null);
     try {
-      await login(email, password);
+      await login(loginValue, password);
       router.push('/app/tanaman', 'root', 'replace');
     } catch (err) {
       if (isValidationError(err)) {
-        setError('Username atau password salah.');
+        setError('Username/email atau password salah.');
       } else {
         setError('Gagal masuk. Periksa koneksi Anda.');
       }
@@ -57,13 +57,13 @@ export default function Login(): React.JSX.Element {
             <div className="kbn-card p-5">
               <form onSubmit={submit} className="space-y-4">
                 <IonInput
-                  label="Username"
+                  label="Username atau Email"
                   labelPlacement="stacked"
                   type="text"
                   autocapitalize="off"
                   fill="outline"
-                  value={email}
-                  onIonInput={(e) => setEmail(e.detail.value ?? '')}
+                  value={loginValue}
+                  onIonInput={(e) => setLoginValue(e.detail.value ?? '')}
                   required
                 />
                 <IonInput

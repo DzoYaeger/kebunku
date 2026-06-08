@@ -18,6 +18,9 @@ import {
   documentTextOutline,
   wallet,
   walletOutline,
+  medkit,
+  medkitOutline,
+  chatbubbleEllipses,
 } from 'ionicons/icons';
 
 import { useAuthStore } from './store/authStore';
@@ -33,6 +36,10 @@ import LahanListPage from './pages/Lahan/LahanListPage';
 import TanamanDetailPage from './pages/Lahan/TanamanDetailPage';
 import AktivitasListPage from './pages/Aktivitas/AktivitasListPage';
 import KeuanganPage from './pages/Keuangan/KeuanganPage';
+import PerawatanPage from './pages/Perawatan/PerawatanPage';
+import SettingsPage from './pages/Settings/SettingsPage';
+import ChatListPage from './pages/Chat/ChatListPage';
+import ChatRoomPage from './pages/Chat/ChatRoomPage';
 
 // Shell tab utama (Lahan / Aktivitas / Keuangan) — design-system.md.
 function MainTabs(): React.JSX.Element {
@@ -43,15 +50,30 @@ function MainTabs(): React.JSX.Element {
         <Route exact path="/app/tanaman/:uuid" component={TanamanDetailPage} />
         <Route exact path="/app/aktivitas" component={AktivitasListPage} />
         <Route exact path="/app/keuangan" component={KeuanganPage} />
+        <Route exact path="/app/perawatan" component={PerawatanPage} />
+        <Route exact path="/app/pengaturan" component={SettingsPage} />
+        <Route exact path="/app/chat" component={ChatListPage} />
+        <Route exact path="/app/chat/:id" component={ChatRoomPage} />
         <Route exact path="/app">
           <Redirect to="/app/tanaman" />
         </Route>
       </IonRouterOutlet>
-      <IonTabBar slot="bottom">
+      <IonTabBar slot="bottom" className="kbn-tabbar">
         <IonTabButton tab="tanaman" href="/app/tanaman">
           <IonIcon aria-hidden="true" className="icon-inactive" icon={leafOutline} />
           <IonIcon aria-hidden="true" className="icon-active" icon={leaf} />
           <IonLabel>Tanaman</IonLabel>
+        </IonTabButton>
+        <IonTabButton tab="perawatan" href="/app/perawatan">
+          <IonIcon aria-hidden="true" className="icon-inactive" icon={medkitOutline} />
+          <IonIcon aria-hidden="true" className="icon-active" icon={medkit} />
+          <IonLabel>Perawatan</IonLabel>
+        </IonTabButton>
+        <IonTabButton tab="chat" href="/app/chat" className="kbn-tab-center">
+          <div className="kbn-fab-chat">
+            <IonIcon aria-hidden="true" icon={chatbubbleEllipses} />
+          </div>
+          <IonLabel className="kbn-tab-center-label">Konsultasi</IonLabel>
         </IonTabButton>
         <IonTabButton tab="keuangan" href="/app/keuangan">
           <IonIcon aria-hidden="true" className="icon-inactive" icon={walletOutline} />

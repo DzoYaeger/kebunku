@@ -4,11 +4,12 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 /**
- * @mixin \App\Models\User
+ * @mixin \App\Models\ChatMessage
  */
-class UserResource extends JsonResource
+class ChatMessageResource extends JsonResource
 {
     /**
      * @return array<string, mixed>
@@ -17,11 +18,11 @@ class UserResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'name' => $this->name,
-            'username' => $this->username,
-            'email' => $this->email,
+            'chat_session_id' => $this->chat_session_id,
+            'role' => $this->role,
+            'content' => $this->content,
+            'image_url' => $this->image_path ? Storage::url($this->image_path) : null,
             'created_at' => $this->created_at?->toIso8601String(),
-            'updated_at' => $this->updated_at?->toIso8601String(),
         ];
     }
 }

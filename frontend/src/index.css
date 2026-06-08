@@ -42,6 +42,8 @@ ion-tab-bar {
   border-top: 1px solid #eef2f6;
   padding-bottom: env(safe-area-inset-bottom);
   height: calc(58px + env(safe-area-inset-bottom));
+  overflow: visible;
+  contain: none;
 }
 ion-tab-button {
   --color: #94a3b8;
@@ -64,6 +66,43 @@ ion-tab-button.tab-selected .icon-inactive {
 ion-tab-button.tab-selected ion-icon {
   transform: translateY(-1px) scale(1.05);
   transition: transform 0.2s ease;
+}
+
+/* ---------- Raised center Chat button ---------- */
+.kbn-tab-center {
+  --color-selected: #0f5132;
+  overflow: visible;
+  contain: none;
+}
+.kbn-tab-center::part(native) {
+  overflow: visible;
+  contain: none;
+}
+.kbn-fab-chat {
+  position: relative;
+  top: -18px;
+  z-index: 20;
+  width: 56px;
+  height: 56px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #0f5132 0%, #198754 60%, #21a366 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(25, 135, 84, 0.45), 0 2px 4px rgba(16, 24, 40, 0.15);
+  border: 3px solid #fff;
+  transition: transform 0.18s ease;
+}
+.kbn-fab-chat ion-icon {
+  color: #fff;
+  font-size: 1.6rem;
+}
+.kbn-tab-center.tab-selected .kbn-fab-chat {
+  transform: scale(1.06) translateY(-2px);
+}
+.kbn-tab-center-label {
+  position: relative;
+  top: -14px;
 }
 
 /* ---------- Kartu ---------- */
