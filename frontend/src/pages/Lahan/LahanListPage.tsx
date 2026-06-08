@@ -55,7 +55,7 @@ export default function LahanListPage(): React.JSX.Element {
   const [komoditasOptions, setKomoditasOptions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
-  const [grouped, setGrouped] = useState(false);
+  const [grouped, setGrouped] = useState(true);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('semua');
   const [sort, setSort] = useState<SortMode>('newest');
@@ -70,6 +70,9 @@ export default function LahanListPage(): React.JSX.Element {
     const [list, komoditas] = await Promise.all([lahanRepo.list(), lahanRepo.komoditasList()]);
     setItems(list);
     setKomoditasOptions(komoditas);
+    // Minimize semua grup saat pertama load
+    const keys = new Set(list.map((l) => l.komoditas.trim().toLowerCase()));
+    setCollapsedGroups(keys);
   }, []);
 
   const sync = useCallback(async (): Promise<void> => {
