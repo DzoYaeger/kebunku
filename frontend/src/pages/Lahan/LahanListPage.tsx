@@ -21,12 +21,13 @@ import {
   useIonViewWillEnter,
   useIonRouter,
 } from '@ionic/react';
-import { add, leafOutline, layersOutline, swapVerticalOutline, sparklesOutline, checkmarkCircleOutline } from 'ionicons/icons';
+import { add, leafOutline, layersOutline, swapVerticalOutline, sparklesOutline, checkmarkCircleOutline, chevronDownOutline, chevronUpOutline } from 'ionicons/icons';
 import type { LahanLocal } from '../../db';
 import { lahanRepo, type LahanInput } from '../../db/repository';
 import { runSync } from '../../sync/SyncEngine';
 import { hydrateFromServer } from '../../sync/hydrate';
 import { useSyncStore } from '../../store/syncStore';
+import { useAuthStore } from '../../store/authStore';
 import { SyncIndicator } from '../../components/SyncIndicator';
 import { AccountButton } from '../../components/AccountButton';
 import { EmptyState } from '../../components/EmptyState';
@@ -49,11 +50,13 @@ interface Group {
 
 export default function LahanListPage(): React.JSX.Element {
   const router = useIonRouter();
+  const userName = useAuthStore((s) => s.user?.name);
   const [items, setItems] = useState<LahanLocal[]>([]);
   const [komoditasOptions, setKomoditasOptions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [grouped, setGrouped] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('semua');
   const [sort, setSort] = useState<SortMode>('newest');
   const [sortSheet, setSortSheet] = useState(false);
@@ -171,7 +174,7 @@ export default function LahanListPage(): React.JSX.Element {
       <IonHeader className="ion-no-border">
         <IonToolbar>
           <IonButtons slot="start"><AccountButton /></IonButtons>
-          <IonTitle>Tanaman</IonTitle>
+          <IonTitle>{userName ? `Halo, ${userName}` : 'Tanaman'}</IonTitle>
           <IonButtons slot="end"><SyncIndicator /></IonButtons>
         </IonToolbar>
       </IonHeader>
@@ -280,18 +283,39 @@ export default function LahanListPage(): React.JSX.Element {
                 </div>
               ) : grouped ? (
                 <div>
-                  {groups.map((g) => (
-                    <div key={g.key} className="mb-5">
-                      <div className="flex items-center gap-2.5 px-1 mb-2.5">
-                        <CommodityAvatar komoditas={g.nama} className="!w-8 !h-8 !text-lg !rounded-xl" />
-                        <div>
-                          <span className="text-[0.88rem] font-bold text-slate-dark">{g.nama}</span>
-                          <p className="text-[0.65rem] text-slate-muted">{g.items.length} bedengan</p>
-                        </div>
+                  {groups.map((g) => {
+                    const isCollapsed = collapsedGroups.has(g.key);
+                    const toggleCollapse = (): void => {
+                      setCollapsedGroups((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(g.key)) next.delete(g.key);
+                        else next.add(g.key);
+                        return next;
+                      });
+                    };
+                    return (
+                      <div key={g.key} className="mb-4">
+                        <button
+                          type="button"
+                          onClick={toggleCollapse}
+                          className="flex items-center gap-2.5 px-1 mb-2 w-full text-left"
+                        >
+                          <CommodityAvatar komoditas={g.nama} className="!w-8 !h-8 !text-lg !rounded-xl" />
+                          <div className="flex-1">
+                            <span className="text-[0.88rem] font-bold text-slate-dark">{g.nama}</span>
+                            <p className="text-[0.65rem] text-slate-muted">{g.items.length} bedengan</p>
+                          </div>
+                          <IonIcon
+                            icon={isCollapsed ? chevronDownOutline : chevronUpOutline}
+                            className="text-slate-muted text-lg"
+                          />
+                        </button>
+                        {!isCollapsed && (
+                          <div className="kbn-stagger">{g.items.map(renderCard)}</div>
+                        )}
                       </div>
-                      <div className="kbn-stagger">{g.items.map(renderCard)}</div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="kbn-stagger">{sorted.map(renderCard)}</div>

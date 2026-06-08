@@ -12,7 +12,7 @@ import {
   IonLabel,
   IonRefresher,
   IonRefresherContent,
-  useIonViewDidEnter,
+  useIonViewWillEnter,
 } from '@ionic/react';
 import {
   timeOutline,
@@ -156,11 +156,10 @@ export default function AktivitasListPage(): React.JSX.Element {
     } catch {/* data lokal */}
   }, [reload]);
 
-  useIonViewDidEnter(() => {
+  useIonViewWillEnter(() => {
     void (async (): Promise<void> => {
       await reload();
       setLoading(false);
-      await sync();
     })();
   });
 
