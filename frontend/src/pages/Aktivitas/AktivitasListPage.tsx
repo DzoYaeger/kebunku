@@ -57,6 +57,7 @@ interface TimelineItem {
 function buildTimeline(
   aktivitas: AktivitasLocal[],
   transaksi: TransaksiLocal[],
+  lahanList: LahanLocal[],
   lahanMap: Map<string, LahanLocal>,
 ): TimelineItem[] {
   const items: TimelineItem[] = [];
@@ -68,6 +69,26 @@ function buildTimeline(
     pestisida: { icon: bugOutline, bg: '#FFE4E6', fg: '#BE123C', label: 'Pestisida' },
   };
 
+  // Tanaman yang ditambahkan → masuk riwayat sebagai "Tanaman Baru"
+  for (const l of lahanList) {
+    items.push({
+      id: `l-${l.client_uuid}`,
+      source: 'tanaman',
+      tanggal: l.tanggal_tanam ?? l.created_at.slice(0, 10),
+      created_at: l.created_at,
+      icon: leafOutline,
+      iconBg: '#DCFCE7',
+      iconColor: '#15803D',
+      title: `Tanaman Baru · ${l.komoditas}`,
+      subtitle: `Bed ${l.nomor_bed}${l.catatan ? ` · ${l.catatan}` : ''}`,
+      badge: l.status,
+      badgeBg: l.status === 'aktif' ? '#DCFCE7' : l.status === 'semai' ? '#FEF3C7' : '#E2E8F0',
+      badgeColor: l.status === 'aktif' ? '#15803D' : l.status === 'semai' ? '#B45309' : '#475569',
+      dirty: l._dirty === 1,
+    });
+  }
+
+  // Aktivitas (semai, pindah tanam, pupuk, pestisida)
   for (const a of aktivitas) {
     const meta = TIPE_META[a.tipe] ?? TIPE_META.semai;
     const lahan = lahanMap.get(a.lahan_uuid);
@@ -145,7 +166,7 @@ export default function AktivitasListPage(): React.JSX.Element {
       lahanRepo.list(),
     ]);
     const lahanMap = new Map(lahan.map((l) => [l.client_uuid, l]));
-    setTimeline(buildTimeline(aktivitas, transaksi, lahanMap));
+    setTimeline(buildTimeline(aktivitas, transaksi, lahan, lahanMap));
   }, []);
 
   const sync = useCallback(async (): Promise<void> => {
