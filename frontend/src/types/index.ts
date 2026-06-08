@@ -21,6 +21,7 @@ export interface Lahan {
   nomor_bed: string;
   komoditas: string;
   status: LahanStatus;
+  tanggal_tanam: string | null;
   catatan: string | null;
   created_at: string | null;
   updated_at: string | null;

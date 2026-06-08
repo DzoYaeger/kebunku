@@ -41,6 +41,7 @@ class LahanController extends Controller
             'nomor_bed' => $request->string('nomor_bed'),
             'komoditas' => $request->string('komoditas'),
             'status' => $request->input('status', 'semai'),
+            'tanggal_tanam' => $request->input('tanggal_tanam'),
             'catatan' => $request->input('catatan'),
         ]);
 
@@ -58,7 +59,7 @@ class LahanController extends Controller
     {
         $this->authorizeOwnership($request, $lahan);
 
-        $lahan->update($request->only(['nomor_bed', 'komoditas', 'status', 'catatan']));
+        $lahan->update($request->only(['nomor_bed', 'komoditas', 'status', 'tanggal_tanam', 'catatan']));
 
         return new LahanResource($lahan);
     }

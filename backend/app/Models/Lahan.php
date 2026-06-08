@@ -20,6 +20,7 @@ class Lahan extends Model
         'nomor_bed',
         'komoditas',
         'status',
+        'tanggal_tanam',
         'catatan',
     ];
 

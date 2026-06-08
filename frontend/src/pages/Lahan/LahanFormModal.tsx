@@ -36,6 +36,7 @@ export function LahanFormModal({
   const [nomorBed, setNomorBed] = useState('');
   const [komoditas, setKomoditas] = useState('');
   const [status, setStatus] = useState<LahanStatus>('semai');
+  const [tanggalTanam, setTanggalTanam] = useState('');
   const [catatan, setCatatan] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -44,6 +45,7 @@ export function LahanFormModal({
       setNomorBed(editing?.nomor_bed ?? '');
       setKomoditas(editing?.komoditas ?? '');
       setStatus(editing?.status ?? 'semai');
+      setTanggalTanam(editing?.tanggal_tanam ?? '');
       setCatatan(editing?.catatan ?? '');
     }
   }, [isOpen, editing]);
@@ -53,7 +55,13 @@ export function LahanFormModal({
     setSaving(true);
     try {
       await onSubmit(
-        { nomor_bed: nomorBed.trim(), komoditas: komoditas.trim(), status, catatan: catatan.trim() || null },
+        {
+          nomor_bed: nomorBed.trim(),
+          komoditas: komoditas.trim(),
+          status,
+          tanggal_tanam: tanggalTanam || null,
+          catatan: catatan.trim() || null,
+        },
         editing,
       );
       onClose();
@@ -119,6 +127,15 @@ export function LahanFormModal({
             value={nomorBed}
             onIonInput={(e) => setNomorBed(e.detail.value ?? '')}
             placeholder="mis. BED-01"
+          />
+
+          <IonInput
+            label="Tanggal Tanam (opsional)"
+            labelPlacement="stacked"
+            type="date"
+            fill="outline"
+            value={tanggalTanam}
+            onIonInput={(e) => setTanggalTanam(e.detail.value ?? '')}
           />
 
           <IonSelect

@@ -35,6 +35,7 @@ export async function hydrateFromServer(): Promise<void> {
         nomor_bed: l.nomor_bed,
         komoditas: l.komoditas,
         status: l.status,
+        tanggal_tanam: l.tanggal_tanam ?? null,
         catatan: l.catatan,
         created_at: l.created_at ?? new Date().toISOString(),
         updated_at: l.updated_at ?? new Date().toISOString(),

@@ -10,6 +10,7 @@ export interface LahanLocal {
   nomor_bed: string;
   komoditas: string;
   status: LahanStatus;
+  tanggal_tanam: string | null;
   catatan: string | null;
   created_at: string;
   updated_at: string;

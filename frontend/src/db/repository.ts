@@ -35,6 +35,7 @@ export interface LahanInput {
   nomor_bed: string;
   komoditas: string;
   status?: LahanStatus;
+  tanggal_tanam?: string | null;
   catatan?: string | null;
 }
 
@@ -67,6 +68,7 @@ export const lahanRepo = {
       nomor_bed: input.nomor_bed,
       komoditas: input.komoditas,
       status: input.status ?? 'semai',
+      tanggal_tanam: input.tanggal_tanam ?? null,
       catatan: input.catatan ?? null,
       created_at: ts,
       updated_at: ts,
@@ -78,6 +80,7 @@ export const lahanRepo = {
       nomor_bed: record.nomor_bed,
       komoditas: record.komoditas,
       status: record.status,
+      tanggal_tanam: record.tanggal_tanam,
       catatan: record.catatan,
     });
     return record;
@@ -91,6 +94,7 @@ export const lahanRepo = {
       nomor_bed: input.nomor_bed,
       komoditas: input.komoditas,
       status: input.status ?? existing.status,
+      tanggal_tanam: input.tanggal_tanam ?? existing.tanggal_tanam,
       catatan: input.catatan ?? null,
       updated_at: nowIso(),
       _dirty: 1,
@@ -103,6 +107,7 @@ export const lahanRepo = {
         nomor_bed: updated.nomor_bed,
         komoditas: updated.komoditas,
         status: updated.status,
+        tanggal_tanam: updated.tanggal_tanam,
         catatan: updated.catatan,
       });
     }

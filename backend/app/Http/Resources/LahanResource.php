@@ -21,6 +21,7 @@ class LahanResource extends JsonResource
             'nomor_bed' => $this->nomor_bed,
             'komoditas' => $this->komoditas,
             'status' => $this->status,
+            'tanggal_tanam' => $this->tanggal_tanam,
             'catatan' => $this->catatan,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
