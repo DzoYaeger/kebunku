@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PerawatanResource;
 use App\Models\AiSaranCache;
+use App\Models\CarePlan;
 use App\Models\Lahan;
 use App\Models\MusimTanam;
 use App\Models\Panen;
+use App\Models\PupukInventory;
+use App\Models\UserSetting;
 use App\Services\GroqService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -35,9 +38,9 @@ class PerawatanController extends Controller
 
         $riwayat = AiSaranCache::where('user_id', $request->user()->id)
             ->where('lahan_id', $lahan->id)
-            ->where('tipe', 'perawatan')
+            ->where('tipe', 'keluhan')
             ->orderByDesc('created_at')
-            ->get(['id', 'saran', 'created_at']);
+            ->get(['id', 'session_id', 'keluhan_text', 'saran', 'outcome', 'created_at']);
 
         return response()->json([
             'data' => $riwayat,
@@ -85,6 +88,14 @@ class PerawatanController extends Controller
             ])
             ->toArray();
 
+        $settings = UserSetting::firstOrCreate(
+            ['user_id' => $request->user()->id],
+            ['takaran_pupuk' => 'ember 25L', 'takaran_pestisida' => 'tangki 14L'],
+        );
+        $inventory = PupukInventory::where('user_id', $request->user()->id)->get();
+        $pupukList = $inventory->where('tipe', 'pupuk')->pluck('nama')->toArray();
+        $pestisidaList = $inventory->where('tipe', 'pestisida')->pluck('nama')->toArray();
+
         $context = [
             'komoditas' => $lahan->komoditas,
             'nomor_bed' => $lahan->nomor_bed,
@@ -100,16 +111,25 @@ class PerawatanController extends Controller
             'riwayat_panen_terakhir' => $riwayatPanen,
         ];
 
-        $prompt = "Kamu adalah ahli pertanian. Berikut data lengkap tanaman dalam JSON:\n"
+        $pupukInfo = !empty($pupukList) ? "Pupuk TERSEDIA: " . implode(', ', $pupukList) . ". WAJIB kombinasi dari ini." : "";
+        $pestInfo = !empty($pestisidaList) ? "Pestisida TERSEDIA: " . implode(', ', $pestisidaList) . "." : "";
+
+        $prompt = "Kamu adalah ahli pertanian Indonesia. Data tanaman:\n"
             . json_encode($context, JSON_PRETTY_PRINT) . "\n\n"
-            . "Hari ini tanggal: " . now()->toDateString() . "\n\n"
-            . "Berikan jawaban dalam format JSON (HANYA JSON, tanpa markdown) dengan struktur:\n"
+            . "Hari ini: " . now()->toDateString() . "\n\n"
+            . "PENTING:\n"
+            . "- Takaran pupuk petani: {$settings->takaran_pupuk}. Dosis harus dalam satuan ini.\n"
+            . "- Takaran pestisida: {$settings->takaran_pestisida}.\n"
+            . ($pupukInfo ? "- {$pupukInfo}\n" : "")
+            . ($pestInfo ? "- {$pestInfo}\n" : "")
+            . "- Berikan KOMBINASI 2-4 jenis pupuk per jadwal (bukan hanya 1 jenis).\n\n"
+            . "Berikan jawaban dalam format JSON (HANYA JSON, tanpa markdown):\n"
             . "{\n"
-            . "  \"saran\": \"(saran lengkap dalam bahasa Indonesia, praktis dan actionable, mencakup: prioritas tindakan hari ini, rekomendasi pupuk & pestisida, risiko)\",\n"
-            . "  \"jadwal_pupuk\": {\"tanggal\": \"YYYY-MM-DD\", \"jenis\": \"nama pupuk yang direkomendasikan\"},\n"
-            . "  \"jadwal_pestisida\": {\"tanggal\": \"YYYY-MM-DD\", \"jenis\": \"nama pestisida yang direkomendasikan\"}\n"
+            . "  \"saran\": \"(saran lengkap: prioritas hari ini, KOMBINASI pupuk & dosis per {$settings->takaran_pupuk}, pestisida & dosis per {$settings->takaran_pestisida}, risiko)\",\n"
+            . "  \"jadwal_pupuk\": {\"tanggal\": \"YYYY-MM-DD\", \"jenis\": \"KOMBINASI pupuk + dosis\"},\n"
+            . "  \"jadwal_pestisida\": {\"tanggal\": \"YYYY-MM-DD\", \"jenis\": \"nama pestisida + dosis\"}\n"
             . "}\n\n"
-            . "Tentukan tanggal jadwal pupuk dan pestisida berikutnya berdasarkan riwayat dan umur tanam. Jawab singkat, operasional.";
+            . "Jawab singkat, operasional.";
 
         $response = app(GroqService::class)->chat([
             'model' => 'llama-3.3-70b-versatile',
@@ -173,7 +193,11 @@ class PerawatanController extends Controller
             'lahan_id' => 'required|exists:lahan,id',
             'keluhan' => 'required_without:image|nullable|string|max:1000',
             'image' => 'nullable|image|max:5120',
+            'session_id' => 'nullable|uuid',
         ]);
+
+        // Use existing session or create new one
+        $sessionId = $request->input('session_id') ?: (string) \Illuminate\Support\Str::uuid();
 
         $lahan = Lahan::where('user_id', $request->user()->id)
             ->where('id', $request->lahan_id)
@@ -186,15 +210,60 @@ class PerawatanController extends Controller
             'umur_tanam_hari' => $lahan->tanggal_tanam ? now()->diffInDays($lahan->tanggal_tanam) : null,
         ];
 
+        // User's inventory for targeted recommendations
+        $inventory = PupukInventory::where('user_id', $request->user()->id)->get();
+        $pupukUser = $inventory->where('tipe', 'pupuk')->pluck('nama')->toArray();
+        $pestisidaUser = $inventory->where('tipe', 'pestisida')->pluck('nama')->toArray();
+        $settings = UserSetting::where('user_id', $request->user()->id)->first();
+
+        // AI learning: include past successful solutions
+        $pastSuccess = AiSaranCache::where('user_id', $request->user()->id)
+            ->where('tipe', 'keluhan')
+            ->where('outcome', 'success')
+            ->orderByDesc('created_at')
+            ->limit(3)
+            ->pluck('saran')
+            ->toArray();
+
+        // Previous conversation context for this lahan
+        $prevMessages = AiSaranCache::where('user_id', $request->user()->id)
+            ->where('lahan_id', $lahan->id)
+            ->where('tipe', 'keluhan')
+            ->orderByDesc('created_at')
+            ->limit(3)
+            ->get(['saran', 'outcome'])
+            ->reverse()
+            ->values();
+
         $keluhanText = $request->input('keluhan', '');
-        $promptText = "Kamu adalah ahli pertanian & penyakit tanaman. Data tanaman:\n"
-            . json_encode($context, JSON_PRETTY_PRINT) . "\n\n"
+        $learningContext = !empty($pastSuccess)
+            ? "\nSOLUSI YANG PERNAH BERHASIL di kebun ini:\n" . implode("\n---\n", array_map(fn ($s) => mb_substr($s, 0, 200), $pastSuccess))
+            : '';
+
+        $prevContext = $prevMessages->isNotEmpty()
+            ? "\nRIWAYAT KELUHAN SEBELUMNYA pada tanaman ini:\n" . $prevMessages->map(fn ($m) => mb_substr($m->saran, 0, 150) . ($m->outcome !== 'pending' ? " [Hasil: {$m->outcome}]" : ''))->implode("\n---\n")
+            : '';
+
+        $inventoryInfo = '';
+        if (!empty($pestisidaUser)) $inventoryInfo .= "\nPESTISIDA yang DIMILIKI petani: " . implode(', ', $pestisidaUser) . ". UTAMAKAN dari daftar ini.";
+        if (!empty($pupukUser)) $inventoryInfo .= "\nPUPUK yang DIMILIKI petani: " . implode(', ', $pupukUser) . ". UTAMAKAN dari daftar ini.";
+        $takaranInfo = $settings ? "\nTakaran kocor: {$settings->takaran_pupuk}. Takaran semprot: {$settings->takaran_pestisida}." : '';
+
+        $promptText = "Kamu adalah ahli pertanian & konsultan penyakit tanaman. Data tanaman:\n"
+            . json_encode($context, JSON_PRETTY_PRINT) . "\n"
+            . $inventoryInfo . $takaranInfo . $learningContext . $prevContext . "\n\n"
             . ($keluhanText ? "Keluhan petani: \"{$keluhanText}\"\n\n" : "Petani mengirim foto tanaman yang bermasalah.\n\n")
-            . "Berikan diagnosis dan solusi dalam bahasa Indonesia:\n"
-            . "1. Kemungkinan penyakit atau masalah.\n"
-            . "2. Solusi/penanganan yang bisa dilakukan segera.\n"
-            . "3. Pencegahan ke depan.\n"
-            . "Jawab singkat, praktis, dan actionable.";
+            . "INSTRUKSI:\n"
+            . "- Jika terdeteksi serangan HAMA/PENYAKIT, langsung berikan nama obat/pestisida SPESIFIK + dosis.\n"
+            . "- UTAMAKAN pestisida/pupuk yang DIMILIKI petani (lihat daftar di atas). Jika miliknya cocok, sarankan itu PERTAMA.\n"
+            . "- Jika butuh obat lain yang tidak dimiliki, sarankan untuk DIBELI dengan nama produk spesifik.\n"
+            . "- Jika informasi kurang jelas, TANYAKAN BALIK ke petani untuk memperjelas (misal: 'Apakah ada bercak hitam? Apakah di bagian bawah daun ada kutu?').\n"
+            . "- Berikan solusi dengan format:\n"
+            . "  1. DIAGNOSIS: (apa masalahnya)\n"
+            . "  2. TINDAKAN SEGERA: (obat/pestisida spesifik + dosis per takaran)\n"
+            . "  3. PUPUK PENDUKUNG: (jika perlu, kombinasi pupuk + dosis)\n"
+            . "  4. PENCEGAHAN: (langkah ke depan)\n"
+            . "- Jawab dalam bahasa Indonesia, singkat, langsung ke inti.";
 
         // Build messages - use vision model if image present
         $imagePath = null;
@@ -237,18 +306,63 @@ class PerawatanController extends Controller
             'user_id' => $request->user()->id,
             'lahan_id' => $lahan->id,
             'tipe' => 'keluhan',
-            'saran' => "KELUHAN: " . ($keluhanText ?: '[Foto]') . "\n\nSOLUSI:\n" . $solusi,
+            'session_id' => $sessionId,
+            'keluhan_text' => $keluhanText ?: '[Foto]',
+            'saran' => $solusi,
             'hash_key' => md5(($keluhanText ?: 'image') . now()->timestamp),
         ]);
+
+        // Adjust active care plan: add keluhan treatment to unchecked items
+        $activePlan = CarePlan::where('lahan_id', $lahan->id)->where('status', 'active')->first();
+        if ($activePlan) {
+            $schedule = $activePlan->schedule ?? [];
+            $completed = $activePlan->completed_items ?? [];
+            // Insert a new treatment item after the last completed item
+            $insertAt = count($completed) > 0 ? max($completed) + 1 : 0;
+            $newItem = [
+                'minggu' => 0,
+                'tanggal' => now()->toDateString(),
+                'aktivitas' => 'penanganan keluhan',
+                'detail' => mb_substr($solusi, 0, 200),
+                'kocor' => null,
+                'benam' => null,
+                'catatan' => '⚠️ Ditambahkan dari keluhan: ' . mb_substr($keluhanText ?: '[Foto]', 0, 50),
+            ];
+            array_splice($schedule, $insertAt, 0, [$newItem]);
+            // Shift completed indices that are >= insertAt
+            $adjusted = array_map(fn ($i) => $i >= $insertAt ? $i + 1 : $i, $completed);
+            $activePlan->update(['schedule' => $schedule, 'completed_items' => $adjusted]);
+        }
 
         return response()->json([
             'data' => [
                 'id' => $record->id,
+                'session_id' => $sessionId,
                 'keluhan' => $keluhanText ?: '[Foto tanaman]',
                 'solusi' => $solusi,
                 'image_url' => $imagePath ? asset('storage/' . $imagePath) : null,
                 'created_at' => $record->created_at->toISOString(),
             ],
         ]);
+    }
+
+    /**
+     * PUT /api/perawatan/saran-ai/{aiSaranCache}/outcome — update outcome (success/failed).
+     */
+    public function updateOutcome(Request $request, AiSaranCache $aiSaranCache): \Illuminate\Http\JsonResponse
+    {
+        abort_if($aiSaranCache->user_id !== $request->user()->id, 404);
+
+        $request->validate([
+            'outcome' => 'required|in:success,failed',
+            'outcome_note' => 'nullable|string|max:500',
+        ]);
+
+        $aiSaranCache->update([
+            'outcome' => $request->outcome,
+            'outcome_note' => $request->outcome_note,
+        ]);
+
+        return response()->json(['data' => ['id' => $aiSaranCache->id, 'outcome' => $request->outcome]]);
     }
 }

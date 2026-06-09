@@ -14,8 +14,8 @@ import { IonReactRouter } from '@ionic/react-router';
 import {
   pieChart,
   pieChartOutline,
-  calendar,
-  calendarOutline,
+  medkit,
+  medkitOutline,
   leaf,
   leafOutline,
   wallet,
@@ -33,12 +33,11 @@ import { UNAUTHORIZED_EVENT } from './api/token';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import DashboardPage from './pages/Dashboard/DashboardPage';
-import KalenderPage from './pages/Dashboard/KalenderPage';
 import LahanListPage from './pages/Lahan/LahanListPage';
 import TanamanDetailPage from './pages/Lahan/TanamanDetailPage';
 import AktivitasListPage from './pages/Aktivitas/AktivitasListPage';
 import KeuanganPage from './pages/Keuangan/KeuanganPage';
-import PerawatanPage from './pages/Perawatan/PerawatanPage';
+import ManajemenPupukPage from './pages/Perawatan/ManajemenPupukPage';
 import SettingsPage from './pages/Settings/SettingsPage';
 import ChatListPage from './pages/Chat/ChatListPage';
 import ChatRoomPage from './pages/Chat/ChatRoomPage';
@@ -50,13 +49,12 @@ function MainTabs(): React.JSX.Element {
     <IonTabs>
       <IonRouterOutlet>
         <Route exact path="/app/dashboard" component={DashboardPage} />
-        <Route exact path="/app/kalender" component={KalenderPage} />
         <Route exact path="/app/tanaman" component={LahanListPage} />
         <Route exact path="/app/tanaman/:uuid" component={TanamanDetailPage} />
         <Route exact path="/app/panen" component={PanenListPage} />
         <Route exact path="/app/aktivitas" component={AktivitasListPage} />
         <Route exact path="/app/keuangan" component={KeuanganPage} />
-        <Route exact path="/app/perawatan" component={PerawatanPage} />
+        <Route exact path="/app/manajemen-pupuk" component={ManajemenPupukPage} />
         <Route exact path="/app/pengaturan" component={SettingsPage} />
         <Route exact path="/app/chat" component={ChatListPage} />
         <Route exact path="/app/chat/:id" component={ChatRoomPage} />
@@ -86,10 +84,10 @@ function MainTabs(): React.JSX.Element {
           <IonIcon aria-hidden="true" className="icon-active" icon={wallet} />
           <IonLabel>Keuangan</IonLabel>
         </IonTabButton>
-        <IonTabButton tab="kalender" href="/app/kalender">
-          <IonIcon aria-hidden="true" className="icon-inactive" icon={calendarOutline} />
-          <IonIcon aria-hidden="true" className="icon-active" icon={calendar} />
-          <IonLabel>Kalender</IonLabel>
+        <IonTabButton tab="pupuk" href="/app/manajemen-pupuk">
+          <IonIcon aria-hidden="true" className="icon-inactive" icon={medkitOutline} />
+          <IonIcon aria-hidden="true" className="icon-active" icon={medkit} />
+          <IonLabel>Pupuk</IonLabel>
         </IonTabButton>
       </IonTabBar>
     </IonTabs>

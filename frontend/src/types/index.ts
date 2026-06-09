@@ -234,3 +234,37 @@ export interface DashboardData {
   berat_panen_bulan_ini: number;
   laba_total_estimasi: number;
 }
+
+// Care Plan
+export interface CarePlanScheduleItem {
+  minggu: number;
+  tanggal: string;
+  aktivitas: string;
+  detail: string;
+  kocor?: string | null;
+  benam?: string | null;
+  catatan?: string;
+}
+
+export interface CarePlan {
+  id: number;
+  user_id: number;
+  lahan_id: number;
+  schedule: CarePlanScheduleItem[];
+  summary: string;
+  status: 'active' | 'completed' | 'superseded';
+  completed_items: number[] | null;
+  lahan?: { id: number; nomor_bed: string; komoditas: string };
+  created_at: string;
+  updated_at: string;
+}
+
+// Plant Feedback
+export interface PlantFeedback {
+  id: number;
+  tipe: 'progress' | 'keluhan';
+  content: string;
+  ai_response: string | null;
+  image_url: string | null;
+  created_at: string;
+}

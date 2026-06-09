@@ -10,7 +10,7 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // Akun tunggal untuk login.
+        // Akun demo untuk login.
         User::updateOrCreate(
             ['email' => 'yaeger@kebunku.app'],
             [
@@ -19,6 +19,14 @@ class DatabaseSeeder extends Seeder
                 'password' => Hash::make('se7encyber'),
             ],
         );
+
+        $this->call([
+            LahanSeeder::class,
+            AktivitasSeeder::class,
+            TransaksiSeeder::class,
+            MusimTanamSeeder::class,
+            PanenSeeder::class,
+        ]);
 
         $this->command->info('Seeder selesai. Login: yaeger / se7encyber');
     }

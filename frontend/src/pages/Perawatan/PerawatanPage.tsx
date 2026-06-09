@@ -5,7 +5,6 @@ import {
   IonToolbar,
   IonTitle,
   IonButtons,
-  IonBackButton,
   IonContent,
   IonChip,
   IonLabel,
@@ -22,13 +21,14 @@ import {
   IonToast,
   useIonViewWillEnter,
 } from '@ionic/react';
-import { sparkles, leaf, bug, chevronDown, chevronUp, calendarOutline, layersOutline, timeOutline, refreshOutline, swapVerticalOutline, alertCircleOutline, cameraOutline } from 'ionicons/icons';
+import { sparkles, leaf, bug, chevronDown, chevronUp, calendarOutline, layersOutline, timeOutline, refreshOutline, swapVerticalOutline, alertCircleOutline, cameraOutline, clipboardOutline } from 'ionicons/icons';
 import { api } from '../../api/client';
 import { db } from '../../db';
 import { aktivitasRepo } from '../../db/repository';
 import { runSync } from '../../sync/SyncEngine';
 import { CommodityAvatar } from '../../components/CommodityAvatar';
 import { SyncIndicator } from '../../components/SyncIndicator';
+import { useHistory } from 'react-router-dom';
 import type { PerawatanLahan, SaranAiResponse, ApiCollection, ApiResource } from '../../types';
 
 interface SaranRiwayat {
@@ -59,6 +59,7 @@ interface PerawatanGroup {
 }
 
 export default function PerawatanPage(): React.JSX.Element {
+  const history = useHistory();
   const [data, setData] = useState<PerawatanLahan[]>([]);
   const [loading, setLoading] = useState(true);
   const [aiLoading, setAiLoading] = useState<number | null>(null);
@@ -404,6 +405,18 @@ export default function PerawatanPage(): React.JSX.Element {
                   <IonIcon icon={alertCircleOutline} slot="start" />
                   <IonLabel>Lapor Keluhan / Penyakit</IonLabel>
                 </IonButton>
+                {/* Rencana Perawatan AI */}
+                <IonButton
+                  expand="block"
+                  fill="outline"
+                  size="small"
+                  color="tertiary"
+                  className="mt-2 text-xs"
+                  onClick={() => history.push(`/app/perawatan/care-plan/${item.lahan_id}`)}
+                >
+                  <IonIcon icon={clipboardOutline} slot="start" />
+                  <IonLabel>Rencana & Feedback</IonLabel>
+                </IonButton>
               </div>
             ) : (
               <div className="mt-1 space-y-2">
@@ -434,6 +447,17 @@ export default function PerawatanPage(): React.JSX.Element {
                   <IonIcon icon={alertCircleOutline} slot="start" />
                   <IonLabel>Lapor Keluhan / Penyakit</IonLabel>
                 </IonButton>
+                <IonButton
+                  expand="block"
+                  fill="outline"
+                  size="small"
+                  color="tertiary"
+                  className="text-xs"
+                  onClick={() => history.push(`/app/perawatan/care-plan/${item.lahan_id}`)}
+                >
+                  <IonIcon icon={clipboardOutline} slot="start" />
+                  <IonLabel>Rencana & Feedback</IonLabel>
+                </IonButton>
               </div>
             )}
           </div>
@@ -446,8 +470,7 @@ export default function PerawatanPage(): React.JSX.Element {
     <IonPage>
       <IonHeader className="ion-no-border">
         <IonToolbar>
-          <IonButtons slot="start"><IonBackButton defaultHref="/app/tanaman" text="" /></IonButtons>
-          <IonTitle className="font-semibold text-base">Perawatan</IonTitle>
+          <IonTitle className="font-semibold text-base">Pemeliharaan</IonTitle>
           <IonButtons slot="end"><SyncIndicator /></IonButtons>
         </IonToolbar>
       </IonHeader>

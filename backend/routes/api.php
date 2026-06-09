@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AktivitasController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CarePlanController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\CuacaController;
 use App\Http\Controllers\Api\DashboardController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\Api\LahanController;
 use App\Http\Controllers\Api\MusimTanamController;
 use App\Http\Controllers\Api\PanenController;
 use App\Http\Controllers\Api\PerawatanController;
+use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\TransaksiController;
 use Illuminate\Support\Facades\Route;
 
@@ -66,11 +68,37 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/perawatan', [PerawatanController::class, 'index']);
     Route::post('/perawatan/saran-ai', [PerawatanController::class, 'saranAi']);
     Route::post('/perawatan/keluhan', [PerawatanController::class, 'keluhan']);
+    Route::put('/perawatan/saran-ai/{aiSaranCache}/outcome', [PerawatanController::class, 'updateOutcome']);
     Route::get('/perawatan/saran-ai/{lahan}', [PerawatanController::class, 'riwayatSaran']);
+
+    // Care Plans
+    Route::get('/care-plans', [CarePlanController::class, 'index']);
+    Route::post('/care-plans/generate', [CarePlanController::class, 'generate']);
+    Route::get('/care-plans/{carePlan}', [CarePlanController::class, 'show']);
+    Route::put('/care-plans/{carePlan}/toggle', [CarePlanController::class, 'toggleItem']);
+    Route::get('/care-plans/{carePlan}/feedback', [CarePlanController::class, 'feedbackList']);
+
+    // Plan Templates
+    Route::get('/plan-templates', [CarePlanController::class, 'listTemplates']);
+    Route::post('/plan-templates', [CarePlanController::class, 'saveTemplate']);
+    Route::post('/plan-templates/{planTemplate}/apply', [CarePlanController::class, 'applyTemplate']);
+    Route::delete('/plan-templates/{planTemplate}', [CarePlanController::class, 'deleteTemplate']);
+
+    // Plant Feedback
+    Route::get('/plant-feedback', [CarePlanController::class, 'feedbackByLahan']);
+    Route::post('/plant-feedback', [CarePlanController::class, 'submitFeedback']);
 
     // Cuaca & Saran Harian
     Route::get('/cuaca', [CuacaController::class, 'index']);
     Route::get('/saran-harian', [CuacaController::class, 'saranHarian']);
+
+    // Settings & Pupuk Inventory
+    Route::get('/settings', [SettingsController::class, 'show']);
+    Route::put('/settings', [SettingsController::class, 'update']);
+    Route::get('/pupuk-inventory', [SettingsController::class, 'inventoryIndex']);
+    Route::post('/pupuk-inventory', [SettingsController::class, 'inventoryStore']);
+    Route::put('/pupuk-inventory/{pupukInventory}', [SettingsController::class, 'inventoryUpdate']);
+    Route::delete('/pupuk-inventory/{pupukInventory}', [SettingsController::class, 'inventoryDestroy']);
 
     // Chat AI
     Route::get('/chat/sessions', [ChatController::class, 'index']);

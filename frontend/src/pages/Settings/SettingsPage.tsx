@@ -28,14 +28,15 @@ import {
   searchOutline,
   closeOutline,
   logOutOutline,
+  beakerOutline,
 } from 'ionicons/icons';
 import { useAuthStore } from '../../store/authStore';
 import { useLocationStore, requestGpsLocation, geocodeCity } from '../../store/locationStore';
-import { isValidationError } from '../../api/client';
+import { isValidationError, api } from '../../api/client';
 import { SyncIndicator } from '../../components/SyncIndicator';
 import { useIonRouter, IonAlert } from '@ionic/react';
 
-type ModalType = 'profil' | 'password' | 'lokasi' | null;
+type ModalType = 'profil' | 'password' | 'lokasi' | 'takaran' | null;
 
 export default function SettingsPage(): React.JSX.Element {
   const user = useAuthStore((s) => s.user);
@@ -75,9 +76,34 @@ export default function SettingsPage(): React.JSX.Element {
   const [locLoading, setLocLoading] = useState(false);
   const [locErr, setLocErr] = useState<string | null>(null);
 
+  // Takaran settings
+  const [takaranPupuk, setTakaranPupuk] = useState('ember 25L');
+  const [takaranPestisida, setTakaranPestisida] = useState('tangki 14L');
+  const [takaranBenam, setTakaranBenam] = useState('per tanaman');
+  const [savingTakaran, setSavingTakaran] = useState(false);
+
   useIonViewWillEnter(() => {
     void loadMe();
+    // Load takaran settings
+    api.get<{ data: { takaran_pupuk: string; takaran_pestisida: string; takaran_benam: string } }>('/settings')
+      .then((res) => {
+        setTakaranPupuk(res.data.data.takaran_pupuk);
+        setTakaranPestisida(res.data.data.takaran_pestisida);
+        setTakaranBenam(res.data.data.takaran_benam ?? 'per tanaman');
+      })
+      .catch(() => undefined);
   });
+
+  const saveTakaran = async (): Promise<void> => {
+    setSavingTakaran(true);
+    try {
+      await api.put('/settings', { takaran_pupuk: takaranPupuk, takaran_pestisida: takaranPestisida, takaran_benam: takaranBenam });
+      setModal(null);
+      setToast('Pengaturan takaran tersimpan.');
+    } catch { /* silent */ } finally {
+      setSavingTakaran(false);
+    }
+  };
 
   const openProfil = (): void => {
     setName(user?.name ?? '');
@@ -200,6 +226,19 @@ export default function SettingsPage(): React.JSX.Element {
             </IonItem>
           </IonList>
 
+          {/* Menu Takaran */}
+          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide px-1 mb-1 mt-4">Takaran Pupuk & Pestisida</p>
+          <IonList inset className="rounded-xl">
+            <IonItem button detail={false} onClick={() => setModal('takaran')}>
+              <IonIcon icon={beakerOutline} slot="start" className="text-emerald-600" />
+              <IonLabel className="text-sm">
+                Alat Takaran
+                <p className="text-[11px] text-slate-400">Kocor: {takaranPupuk} · Benam: {takaranBenam}</p>
+              </IonLabel>
+              <IonIcon icon={chevronForward} slot="end" className="text-slate-300" />
+            </IonItem>
+          </IonList>
+
           {/* Logout */}
           <IonList inset className="rounded-xl mt-4">
             <IonItem button detail={false} onClick={() => setConfirmLogout(true)}>
@@ -297,6 +336,54 @@ export default function SettingsPage(): React.JSX.Element {
 
               {locErr && <IonText color="danger"><p className="text-caption">{locErr}</p></IonText>}
             </div>
+          </IonContent>
+        </IonModal>
+
+        {/* ─── Modal Takaran ─── */}
+        <IonModal isOpen={modal === 'takaran'} onDidDismiss={() => setModal(null)}>
+          <IonHeader>
+            <IonToolbar>
+              <IonTitle>Alat Takaran</IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => setModal(null)}><IonIcon icon={closeOutline} /></IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent className="ion-padding">
+            <p className="text-xs text-slate-500 mb-4">
+              AI akan menggunakan satuan ini untuk semua rekomendasi dosis pupuk dan pestisida.
+            </p>
+            <IonInput
+              label="Takaran Kocor (wadah campuran pupuk cair)"
+              labelPlacement="stacked"
+              fill="outline"
+              placeholder="Contoh: ember 25L, gayung 1.5L"
+              value={takaranPupuk}
+              onIonInput={(e) => setTakaranPupuk(e.detail.value ?? '')}
+              className="mb-4"
+            />
+            <IonInput
+              label="Takaran Benam (pupuk padat di tanah)"
+              labelPlacement="stacked"
+              fill="outline"
+              placeholder="Contoh: per tanaman, per lubang, per meter"
+              value={takaranBenam}
+              onIonInput={(e) => setTakaranBenam(e.detail.value ?? '')}
+              className="mb-4"
+            />
+            <IonInput
+              label="Takaran Pestisida (alat semprot)"
+              labelPlacement="stacked"
+              fill="outline"
+              placeholder="Contoh: tangki 14L, sprayer 2L"
+              value={takaranPestisida}
+              onIonInput={(e) => setTakaranPestisida(e.detail.value ?? '')}
+              className="mb-4"
+            />
+            <IonButton expand="block" onClick={() => void saveTakaran()} disabled={savingTakaran}>
+              {savingTakaran ? <IonSpinner name="dots" className="w-4 h-4 mr-2" /> : null}
+              Simpan
+            </IonButton>
           </IonContent>
         </IonModal>
 

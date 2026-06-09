@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\LahanRequest;
 use App\Http\Resources\LahanResource;
 use App\Models\Lahan;
+use App\Services\CarePlanService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -45,6 +46,13 @@ class LahanController extends Controller
             'tanggal_tanam' => $request->input('tanggal_tanam'),
             'catatan' => $request->input('catatan'),
         ]);
+
+        // Auto-generate care plan via AI (fire & forget, don't block response)
+        try {
+            app(CarePlanService::class)->generatePlan($lahan);
+        } catch (\Throwable) {
+            // Non-blocking: if AI fails, lahan is still created
+        }
 
         return (new LahanResource($lahan))->response()->setStatusCode(201);
     }
