@@ -18,20 +18,16 @@ import {
   IonLabel,
   IonRefresher,
   IonRefresherContent,
-  IonSpinner,
   useIonViewWillEnter,
   useIonRouter,
 } from '@ionic/react';
-import { add, leafOutline, layersOutline, swapVerticalOutline, chevronDownOutline, chevronUpOutline, rainy, sunny, cloudy, sparkles, navigateOutline, locationOutline } from 'ionicons/icons';
+import { add, leafOutline, layersOutline, swapVerticalOutline, chevronDownOutline, chevronUpOutline, colorPaletteOutline } from 'ionicons/icons';
 import type { LahanLocal } from '../../db';
 import { lahanRepo, type LahanInput } from '../../db/repository';
 import { runSync } from '../../sync/SyncEngine';
 import { hydrateFromServer } from '../../sync/hydrate';
 import { useSyncStore } from '../../store/syncStore';
 import { useAuthStore } from '../../store/authStore';
-import { api } from '../../api/client';
-import { useLocationStore } from '../../store/locationStore';
-import type { SaranHarianResponse, ApiResource } from '../../types';
 import { SyncIndicator } from '../../components/SyncIndicator';
 import { AccountButton } from '../../components/AccountButton';
 import { EmptyState } from '../../components/EmptyState';
@@ -39,6 +35,7 @@ import { CardSkeleton } from '../../components/CardSkeleton';
 import { CommodityAvatar } from '../../components/CommodityAvatar';
 import { LahanCard } from './LahanCard';
 import { LahanFormModal } from './LahanFormModal';
+import { BulkPerawatanModal } from './BulkPerawatanModal';
 
 const OFFLINE_MSG = 'Disimpan secara lokal (Mode Offline)';
 
@@ -61,32 +58,16 @@ export default function LahanListPage(): React.JSX.Element {
   const [query, setQuery] = useState('');
   const [grouped, setGrouped] = useState(true);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('semua');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('aktif');
   const [sort, setSort] = useState<SortMode>('newest');
   const [sortSheet, setSortSheet] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<LahanLocal | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<LahanLocal | null>(null);
+  const [addSheet, setAddSheet] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const refreshCounts = useSyncStore((s) => s.refreshCounts);
-
-  // Cuaca & Saran AI state
-  const [saranData, setSaranData] = useState<SaranHarianResponse | null>(null);
-  const [saranLoading, setSaranLoading] = useState(false);
-  const [saranExpanded, setSaranExpanded] = useState(false);
-  const location = useLocationStore((s) => s.location);
-
-  const fetchSaran = useCallback(async (): Promise<void> => {
-    if (!navigator.onLine) return;
-    setSaranLoading(true);
-    try {
-      const res = await api.get<ApiResource<SaranHarianResponse>>('/saran-harian', {
-        params: { lat: location.lat, lon: location.lon },
-      });
-      setSaranData(res.data.data);
-    } catch { /* silent */ }
-    finally { setSaranLoading(false); }
-  }, [location.lat, location.lon]);
 
   const reload = useCallback(async (): Promise<void> => {
     const [list, komoditas] = await Promise.all([lahanRepo.list(), lahanRepo.komoditasList()]);
@@ -110,7 +91,6 @@ export default function LahanListPage(): React.JSX.Element {
       await reload();
       setLoading(false);
       await sync();
-      await fetchSaran();
     })();
   });
 
@@ -215,92 +195,59 @@ export default function LahanListPage(): React.JSX.Element {
             <CardSkeleton count={4} hero />
           ) : (
             <>
-              {/* ═══ HERO: CUACA + RINGKAS ═══ */}
+              {/* ═══ HERO: RINGKASAN + QUICK ACTIONS ═══ */}
               {items.length > 0 && (
                 <div className="kbn-hero kbn-fade-up p-5 mb-4">
                   <div className="relative z-10">
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-center justify-between">
                       <div>
-                        <div className="flex items-center gap-1.5 text-white/70">
-                          <IonIcon icon={location.label.includes('GPS') ? navigateOutline : locationOutline} className="text-sm" />
-                          <span className="text-[0.7rem] font-semibold tracking-wide">{location.label}</span>
+                        <p className="text-[0.7rem] text-white/60 font-medium uppercase tracking-wide">Total Tanaman</p>
+                        <p className="text-[1.6rem] font-extrabold leading-none mt-0.5">{stats.total}</p>
+                        <p className="text-[0.7rem] text-white/70 mt-0.5">{stats.komoditas} komoditas</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="text-center px-2.5 py-1.5 rounded-xl bg-white/10">
+                          <p className="text-[0.95rem] font-bold">{stats.semai}</p>
+                          <p className="text-[0.55rem] text-white/60">Semai</p>
                         </div>
-                        {saranData ? (
-                          <>
-                            <p className="text-[1.8rem] font-extrabold mt-1 leading-none">
-                              {saranData.cuaca.suhu}°<span className="text-[1rem] font-semibold text-white/70">C</span>
-                            </p>
-                            <p className="text-[0.8rem] text-white/80 mt-0.5">{saranData.cuaca.deskripsi}</p>
-                          </>
-                        ) : (
-                          <p className="text-[1.4rem] font-extrabold mt-1 leading-none">Kebun Saya</p>
-                        )}
-                      </div>
-                      <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center">
-                        <IonIcon
-                          icon={saranData ? (saranData.cuaca.akan_hujan ? rainy : saranData.cuaca.kode_cuaca <= 1 ? sunny : cloudy) : leafOutline}
-                          className="text-2xl text-white"
-                        />
+                        <div className="text-center px-2.5 py-1.5 rounded-xl bg-white/10">
+                          <p className="text-[0.95rem] font-bold">{stats.aktif}</p>
+                          <p className="text-[0.55rem] text-white/60">Aktif</p>
+                        </div>
+                        <div className="text-center px-2.5 py-1.5 rounded-xl bg-white/10">
+                          <p className="text-[0.95rem] font-bold">{stats.selesai}</p>
+                          <p className="text-[0.55rem] text-white/60">Panen</p>
+                        </div>
                       </div>
                     </div>
 
-                    {saranData?.cuaca.akan_hujan && (
-                      <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-blue-400/20 px-2.5 py-1 text-[0.7rem] font-semibold text-blue-50">
-                        🌧 Kemungkinan hujan {saranData.cuaca.probabilitas_hujan}% hari ini
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-3 gap-2 mt-4 pt-3.5 border-t border-white/15">
-                      <div className="text-center">
-                        <p className="text-[1rem] font-bold">{stats.semai}</p>
-                        <p className="text-[0.6rem] text-white/60">Semai</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-[1rem] font-bold">{stats.aktif}</p>
-                        <p className="text-[0.6rem] text-white/60">Aktif</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-[1rem] font-bold">{stats.selesai}</p>
-                        <p className="text-[0.6rem] text-white/60">Selesai</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ═══ SARAN AI HARIAN (prominent) ═══ */}
-              {items.length > 0 && (
-                <div className="mb-4 rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white shadow-sm overflow-hidden">
-                  <div className="flex items-center gap-2 px-4 pt-3.5 pb-2">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center">
-                      <IonIcon icon={sparkles} className="text-emerald-600 text-base" />
-                    </div>
-                    <p className="text-sm font-bold text-emerald-900 flex-1">Saran AI Hari Ini</p>
-                    {saranData && (
-                      <button type="button" onClick={() => setSaranExpanded((v) => !v)}>
-                        <IonIcon icon={saranExpanded ? chevronUpOutline : chevronDownOutline} className="text-emerald-400 text-lg" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="px-4 pb-4">
-                    {saranLoading ? (
-                      <div className="flex items-center gap-2 py-2">
-                        <IonSpinner name="dots" className="w-4 h-4" color="primary" />
-                        <span className="text-xs text-slate-500">Menganalisis cuaca & tanamanmu...</span>
-                      </div>
-                    ) : saranData ? (
-                      <p className={`text-[12px] text-slate-700 whitespace-pre-line leading-relaxed ${saranExpanded ? '' : 'line-clamp-3'}`}>
-                        {saranData.saran}
-                      </p>
-                    ) : (
+                    {/* Quick actions */}
+                    <div className="flex gap-2 mt-4 pt-3 border-t border-white/15">
                       <button
                         type="button"
-                        onClick={() => void fetchSaran()}
-                        className="text-xs text-emerald-700 font-semibold"
+                        onClick={() => router.push('/app/perawatan', 'forward', 'push')}
+                        className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-white/15 py-2 active:bg-white/25 transition-colors"
                       >
-                        Ketuk untuk memuat saran AI
+                        <IonIcon icon={colorPaletteOutline} className="text-sm" />
+                        <span className="text-[0.7rem] font-semibold">Perawatan</span>
                       </button>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => router.push('/app/aktivitas', 'forward', 'push')}
+                        className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-white/15 py-2 active:bg-white/25 transition-colors"
+                      >
+                        <IonIcon icon={leafOutline} className="text-sm" />
+                        <span className="text-[0.7rem] font-semibold">Aktivitas</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={openNew}
+                        className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-white/20 py-2 active:bg-white/30 transition-colors"
+                      >
+                        <IonIcon icon={add} className="text-sm" />
+                        <span className="text-[0.7rem] font-semibold">Tambah</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -320,13 +267,13 @@ export default function LahanListPage(): React.JSX.Element {
                   <IonSegment
                     className="kbn-segment mb-3"
                     value={statusFilter}
-                    onIonChange={(e) => setStatusFilter((e.detail.value as StatusFilter) ?? 'semua')}
+                    onIonChange={(e) => setStatusFilter((e.detail.value as StatusFilter) ?? 'aktif')}
                     scrollable
                   >
-                    <IonSegmentButton value="semua"><IonLabel>Semua</IonLabel></IonSegmentButton>
-                    <IonSegmentButton value="semai"><IonLabel>Semai</IonLabel></IonSegmentButton>
                     <IonSegmentButton value="aktif"><IonLabel>Aktif</IonLabel></IonSegmentButton>
+                    <IonSegmentButton value="semai"><IonLabel>Semai</IonLabel></IonSegmentButton>
                     <IonSegmentButton value="selesai"><IonLabel>Selesai</IonLabel></IonSegmentButton>
+                    <IonSegmentButton value="semua"><IonLabel>Semua</IonLabel></IonSegmentButton>
                   </IonSegment>
 
                   {/* Kontrol Grup & Urutkan */}
@@ -403,10 +350,21 @@ export default function LahanListPage(): React.JSX.Element {
         </div>
 
         <IonFab slot="fixed" vertical="bottom" horizontal="end">
-          <IonFabButton onClick={openNew}>
+          <IonFabButton onClick={() => setAddSheet(true)}>
             <IonIcon icon={add} />
           </IonFabButton>
         </IonFab>
+
+        <IonActionSheet
+          isOpen={addSheet}
+          header="Tambah"
+          buttons={[
+            { text: '🌱 Tambah Tanaman', handler: () => openNew() },
+            { text: '💧 Perawatan Bulk (Pupuk/Pestisida)', handler: () => setBulkOpen(true) },
+            { text: 'Batal', role: 'cancel' },
+          ]}
+          onDidDismiss={() => setAddSheet(false)}
+        />
 
         <IonActionSheet
           isOpen={sortSheet}
@@ -445,6 +403,13 @@ export default function LahanListPage(): React.JSX.Element {
           duration={2000}
           onDidDismiss={() => setToast(null)}
           color="medium"
+        />
+
+        <BulkPerawatanModal
+          isOpen={bulkOpen}
+          lahanList={items.filter((l) => l.status !== 'selesai')}
+          onClose={() => setBulkOpen(false)}
+          onDone={(count) => { setBulkOpen(false); setToast(`✅ ${count} perawatan berhasil dicatat`); void reload(); }}
         />
       </IonContent>
     </IonPage>

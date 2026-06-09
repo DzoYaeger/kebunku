@@ -253,3 +253,19 @@ ion-fab-button {
 ion-content {
   --background: #f8fafc;
 }
+
+/* ---------- Hide tab bar di ChatRoom ---------- */
+.hide-tab-bar ion-tab-bar {
+  display: none !important;
+}
+
+/* ---------- Checkbox besar & kontras (Chat lahan selector) ---------- */
+.kbn-checkbox-lg {
+  --size: 26px;
+  --checkbox-background-checked: #198754;
+  --border-color: #cbd5e1;
+  --border-color-checked: #198754;
+  --checkmark-color: #fff;
+  --border-width: 2px;
+  --border-radius: 6px;
+}

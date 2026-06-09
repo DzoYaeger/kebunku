@@ -37,6 +37,7 @@ return [
 
     'groq' => [
         'api_key' => env('GROQ_API_KEY'),
+        'api_keys' => array_filter(explode(',', env('GROQ_API_KEYS', ''))),
     ],
 
 ];

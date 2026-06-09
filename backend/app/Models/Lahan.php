@@ -19,6 +19,7 @@ class Lahan extends Model
         'client_uuid',
         'nomor_bed',
         'komoditas',
+        'icon',
         'status',
         'tanggal_tanam',
         'catatan',
@@ -38,5 +39,21 @@ class Lahan extends Model
     public function aktivitas(): HasMany
     {
         return $this->hasMany(Aktivitas::class);
+    }
+
+    /**
+     * @return HasMany<Panen, $this>
+     */
+    public function panen(): HasMany
+    {
+        return $this->hasMany(Panen::class);
+    }
+
+    /**
+     * @return HasMany<MusimTanam, $this>
+     */
+    public function musimTanam(): HasMany
+    {
+        return $this->hasMany(MusimTanam::class);
     }
 }

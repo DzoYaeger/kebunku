@@ -4,7 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Aktivitas;
+use App\Models\AiSaranCache;
 use App\Models\Lahan;
+use App\Models\MusimTanam;
+use App\Models\Panen;
+use App\Services\GroqService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -108,13 +112,28 @@ class CuacaController extends Controller
             $lastPest = Aktivitas::where('lahan_id', $l->id)
                 ->whereRaw("LOWER(tipe) = 'pestisida'")
                 ->orderByDesc('tanggal')->first();
+            $musimAktif = MusimTanam::where('lahan_id', $l->id)
+                ->where('status', 'aktif')
+                ->orderByDesc('tanggal_mulai')
+                ->first();
+            $lastPanen = Panen::where('lahan_id', $l->id)
+                ->orderByDesc('tanggal')
+                ->first();
 
             return [
                 'komoditas' => $l->komoditas,
                 'bed' => $l->nomor_bed,
                 'status' => $l->status,
+                'tanggal_tanam' => $l->tanggal_tanam,
+                'umur_tanam_hari' => $l->tanggal_tanam ? now()->diffInDays($l->tanggal_tanam) : null,
+                'musim_aktif' => $musimAktif ? [
+                    'tanggal_mulai' => $musimAktif->tanggal_mulai?->toDateString(),
+                    'status' => $musimAktif->status,
+                ] : null,
                 'terakhir_pupuk' => $lastPupuk?->tanggal?->toDateString(),
                 'terakhir_pestisida' => $lastPest?->tanggal?->toDateString(),
+                'terakhir_panen' => $lastPanen?->tanggal?->toDateString(),
+                'berat_terakhir_panen' => $lastPanen?->berat,
             ];
         })->toArray();
 
@@ -123,6 +142,30 @@ class CuacaController extends Controller
                 'data' => [
                     'cuaca' => $cuacaData,
                     'saran' => 'Belum ada tanaman aktif. Tambahkan tanaman untuk mendapat saran perawatan.',
+                ],
+            ]);
+        }
+
+        // Cache key: hash dari ringkasan tanaman + cuaca hari ini
+        $hashKey = md5(json_encode([
+            'ringkasan' => $ringkasan,
+            'cuaca_code' => $cuacaData['kode_cuaca'],
+            'date' => now()->toDateString(),
+        ]));
+
+        // Cek cache database
+        $cached = AiSaranCache::where('user_id', $user->id)
+            ->whereNull('lahan_id')
+            ->where('tipe', 'harian')
+            ->where('hash_key', $hashKey)
+            ->first();
+
+        if ($cached) {
+            return response()->json([
+                'data' => [
+                    'cuaca' => $cuacaData,
+                    'saran' => $cached->saran,
+                    'cached' => true,
                 ],
             ]);
         }
@@ -139,10 +182,7 @@ class CuacaController extends Controller
             . "3. Tips berdasarkan cuaca hari ini.\n"
             . "Jawab langsung tanpa basa-basi.";
 
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . config('services.groq.api_key'),
-            'Content-Type' => 'application/json',
-        ])->timeout(30)->post('https://api.groq.com/openai/v1/chat/completions', [
+        $response = app(GroqService::class)->chat([
             'model' => 'llama-3.3-70b-versatile',
             'messages' => [['role' => 'user', 'content' => $prompt]],
             'temperature' => 0.7,
@@ -160,10 +200,24 @@ class CuacaController extends Controller
 
         $saran = $response->json('choices.0.message.content', 'Tidak ada saran tersedia.');
 
+        // Simpan ke cache database
+        AiSaranCache::updateOrCreate(
+            [
+                'user_id' => $user->id,
+                'lahan_id' => null,
+                'tipe' => 'harian',
+            ],
+            [
+                'saran' => $saran,
+                'hash_key' => $hashKey,
+            ]
+        );
+
         return response()->json([
             'data' => [
                 'cuaca' => $cuacaData,
                 'saran' => $saran,
+                'cached' => false,
             ],
         ]);
     }

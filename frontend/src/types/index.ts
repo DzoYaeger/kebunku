@@ -5,6 +5,8 @@ export interface User {
   name: string;
   username: string | null;
   email: string;
+  role: 'admin' | 'pekerja' | 'viewer';
+  team_owner_id: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -21,6 +23,7 @@ export interface Lahan {
   client_uuid: string;
   nomor_bed: string;
   komoditas: string;
+  icon: string | null;
   status: LahanStatus;
   tanggal_tanam: string | null;
   catatan: string | null;
@@ -111,6 +114,8 @@ export interface SaranAiResponse {
   komoditas: string;
   nomor_bed: string;
   saran: string;
+  jadwal_pupuk?: { tanggal: string; jenis: string } | null;
+  jadwal_pestisida?: { tanggal: string; jenis: string } | null;
 }
 
 // Cuaca & Saran Harian
@@ -168,4 +173,64 @@ export interface ChatSession {
 export interface SendMessageResponse {
   user_message: ChatMessage;
   assistant_message: ChatMessage;
+}
+
+// Panen
+export interface Panen {
+  id: number | null;
+  client_uuid: string;
+  lahan_id: number;
+  lahan?: Lahan;
+  tanggal: string;
+  berat: string;
+  grade: string | null;
+  harga_jual: string | null;
+  total?: string | null;
+  pembeli: string | null;
+  catatan: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PanenMeta {
+  total_panen: number;
+  total_berat: string;
+  total_pendapatan: string;
+}
+
+export interface ProfitKomoditas {
+  komoditas: string;
+  total_berat: number;
+  total_pendapatan: number;
+  total_biaya: number;
+  profit: number;
+  margin: number;
+}
+
+// Musim Tanam
+export type MusimStatus = 'aktif' | 'selesai' | 'gagal';
+
+export interface MusimTanam {
+  id: number | null;
+  client_uuid: string;
+  lahan_id: number;
+  lahan?: Lahan;
+  komoditas: string;
+  tanggal_mulai: string;
+  tanggal_selesai: string | null;
+  status: MusimStatus;
+  catatan: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Dashboard
+export interface DashboardData {
+  lahan_aktif: number;
+  top_komoditas: string | null;
+  top_komoditas_count: number;
+  biaya_bulan_ini: number;
+  pendapatan_bulan_ini: number;
+  berat_panen_bulan_ini: number;
+  laba_total_estimasi: number;
 }

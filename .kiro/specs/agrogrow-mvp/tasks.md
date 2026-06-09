@@ -186,18 +186,35 @@ Rencana eksekusi bertahap. Tiap task incremental, dapat diuji, dan mereferensika
   - _Requirements: Chat AI_
 
 ## Fase 12 — UI/UX Chat AI (Sesuai Feedback User)
-- [ ] 29. Frontend: sesuaikan tab bar saat di halaman Chat
-  - Ukuran tab bar disesuaikan agar tidak mengganggu input teks.
+- [x] 29. Frontend: sesuaikan tab bar saat di halaman Chat
+  - Tab bar di-hide saat masuk ChatRoomPage via CSS class toggle pada `ion-tabs`.
   - _Requirements: UX Improvement_
 
-- [ ] 30. Frontend: pindahkan selector tanaman ke dalam textarea (inline)
-  - Icon @ di dalam textarea.
-  - Saat diklik, modal selector muncul di bawah textarea (bukan di atas).
-  - Pilih lebih dari 1 tanaman (checkbox list).
+- [x] 30. Frontend: pindahkan selector tanaman ke dalam textarea (inline)
+  - Icon @ di dalam footer textarea area.
+  - Saat diklik, modal selector muncul (bottom sheet).
+  - Pilih lebih dari 1 tanaman (checkbox list, multi-select).
+  - Badge tanaman terpilih ditampilkan di atas input area.
   - _Requirements: UX Improvement_
 
-- [ ] 31. Frontend: buat checkbox tanaman lebih jelas
-  - Ukuran checkbox lebih besar.
-  - Warna/visual feedback lebih kontras.
+- [x] 31. Frontend: buat checkbox tanaman lebih jelas
+  - Ukuran checkbox 26px dengan class `kbn-checkbox-lg`.
+  - Warna emerald checked, border 2px, radius 6px.
   - _Requirements: UX Improvement_
+
+## Fase 13 — Cache Saran AI & Multi API Key
+- [x] 32. Backend: Cache/simpan saran AI ke database
+  - Migration `ai_saran_cache` (user_id, lahan_id, tipe, saran, hash_key).
+  - Model `AiSaranCache`.
+  - `PerawatanController@saranAi` cek cache (hash = md5 data+tanggal) sebelum generate.
+  - `CuacaController@saranHarian` cek cache sebelum generate.
+  - Cache auto-invalidate saat data berubah (hash berubah).
+  - _Requirements: Performance, Quota Saving_
+
+- [x] 33. Backend: Multi API key rotation (Groq)
+  - `GroqService` membaca `GROQ_API_KEYS` (comma-separated, max 4 keys).
+  - Saat key kena 429, otomatis coba key berikutnya.
+  - Key rate-limited di-cooldown 60 detik via Cache.
+  - Semua controller AI (Perawatan, Cuaca, Chat) di-refactor pakai `GroqService`.
+  - _Requirements: Reliability, Quota Management_
 

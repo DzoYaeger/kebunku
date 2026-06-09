@@ -4,6 +4,8 @@ import {
   IonHeader,
   IonToolbar,
   IonTitle,
+  IonButtons,
+  IonBackButton,
   IonContent,
   IonChip,
   IonLabel,
@@ -13,12 +15,27 @@ import {
   IonRefresherContent,
   IonIcon,
   IonText,
+  IonModal,
+  IonSearchbar,
+  IonActionSheet,
+  IonTextarea,
+  IonToast,
   useIonViewWillEnter,
 } from '@ionic/react';
-import { sparkles, leaf, bug, chevronDown, chevronUp, calendarOutline, layersOutline } from 'ionicons/icons';
+import { sparkles, leaf, bug, chevronDown, chevronUp, calendarOutline, layersOutline, timeOutline, refreshOutline, swapVerticalOutline, alertCircleOutline, cameraOutline } from 'ionicons/icons';
 import { api } from '../../api/client';
+import { db } from '../../db';
+import { aktivitasRepo } from '../../db/repository';
+import { runSync } from '../../sync/SyncEngine';
 import { CommodityAvatar } from '../../components/CommodityAvatar';
+import { SyncIndicator } from '../../components/SyncIndicator';
 import type { PerawatanLahan, SaranAiResponse, ApiCollection, ApiResource } from '../../types';
+
+interface SaranRiwayat {
+  id: number;
+  saran: string;
+  created_at: string;
+}
 
 function daysSince(dateStr: string): number {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -31,6 +48,10 @@ function urgencyColor(days: number): string {
   return 'text-green-700 bg-green-50 border-green-100';
 }
 
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 interface PerawatanGroup {
   key: string;
   nama: string;
@@ -41,16 +62,32 @@ export default function PerawatanPage(): React.JSX.Element {
   const [data, setData] = useState<PerawatanLahan[]>([]);
   const [loading, setLoading] = useState(true);
   const [aiLoading, setAiLoading] = useState<number | null>(null);
-  const [saranMap, setSaranMap] = useState<Record<number, string>>({});
+  const [saranMap, setSaranMap] = useState<Record<number, SaranRiwayat[]>>({});
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [grouped, setGrouped] = useState(true);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [riwayatModal, setRiwayatModal] = useState<{ lahanId: number; komoditas: string } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortMode, setSortMode] = useState<'urgency' | 'recent' | 'az'>('urgency');
+  const [sortSheet, setSortSheet] = useState(false);
+  // Keluhan state
+  const [keluhanModal, setKeluhanModal] = useState<{ lahanId: number; komoditas: string } | null>(null);
+  const [keluhanText, setKeluhanText] = useState('');
+  const [keluhanImage, setKeluhanImage] = useState<File | null>(null);
+  const [keluhanImagePreview, setKeluhanImagePreview] = useState<string | null>(null);
+  const [keluhanLoading, setKeluhanLoading] = useState(false);
+  const [keluhanResult, setKeluhanResult] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.get<ApiCollection<PerawatanLahan>>('/perawatan');
-      setData(res.data.data);
+      const items = res.data.data;
+      setData(items);
+      // Default: semua grup collapsed
+      const keys = new Set(items.map((i) => i.komoditas.trim().toLowerCase()));
+      setCollapsedGroups(keys);
     } catch {
       // silent
     } finally {
@@ -73,6 +110,10 @@ export default function PerawatanPage(): React.JSX.Element {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+    // Fetch riwayat saran saat expand (kalau belum ada)
+    if (!expanded.has(id) && !saranMap[id]) {
+      void fetchRiwayatSaran(id);
+    }
   };
 
   const toggleGroup = (key: string): void => {
@@ -83,38 +124,146 @@ export default function PerawatanPage(): React.JSX.Element {
     });
   };
 
-  const mintaSaran = async (lahanId: number): Promise<void> => {
+  const fetchRiwayatSaran = async (lahanId: number): Promise<void> => {
+    try {
+      const res = await api.get<{ data: SaranRiwayat[] }>(`/perawatan/saran-ai/${lahanId}`);
+      setSaranMap((prev) => ({ ...prev, [lahanId]: res.data.data }));
+    } catch { /* silent */ }
+  };
+
+  const generateSaran = async (lahanId: number): Promise<void> => {
     setAiLoading(lahanId);
     try {
-      const res = await api.post<ApiResource<SaranAiResponse>>('/perawatan/saran-ai', {
+      const res = await api.post<ApiResource<SaranAiResponse & { id: number; created_at: string }>>('/perawatan/saran-ai', {
         lahan_id: lahanId,
       });
-      setSaranMap((prev) => ({ ...prev, [lahanId]: res.data.data.saran }));
+      const resData = res.data.data;
+      const newItem: SaranRiwayat = {
+        id: resData.id,
+        saran: resData.saran,
+        created_at: resData.created_at,
+      };
+      setSaranMap((prev) => ({
+        ...prev,
+        [lahanId]: [newItem, ...(prev[lahanId] ?? [])],
+      }));
+
+      // Auto-create aktivitas entries for kalender reminder
+      const lahan = await db.lahan.where('server_id').equals(lahanId).first();
+      if (lahan) {
+        const created: string[] = [];
+        if (resData.jadwal_pupuk?.tanggal) {
+          await aktivitasRepo.create({
+            lahan_uuid: lahan.client_uuid,
+            tipe: 'pemupukan',
+            tanggal: resData.jadwal_pupuk.tanggal,
+            jenis_pupuk: resData.jadwal_pupuk.jenis || null,
+            catatan: '📅 Jadwal dari saran AI',
+          });
+          created.push('pupuk ' + resData.jadwal_pupuk.tanggal);
+        }
+        if (resData.jadwal_pestisida?.tanggal) {
+          await aktivitasRepo.create({
+            lahan_uuid: lahan.client_uuid,
+            tipe: 'pestisida',
+            tanggal: resData.jadwal_pestisida.tanggal,
+            jenis_pestisida: resData.jadwal_pestisida.jenis || null,
+            catatan: '📅 Jadwal dari saran AI',
+          });
+          created.push('pestisida ' + resData.jadwal_pestisida.tanggal);
+        }
+        if (created.length > 0) {
+          setToast(`✅ Jadwal ditambahkan ke kalender: ${created.join(', ')}`);
+          if (navigator.onLine) void runSync();
+        }
+      }
     } catch (err: unknown) {
       const msg = (err as { response?: { status?: number } })?.response?.status === 429
         ? 'Quota AI habis, coba lagi dalam beberapa saat.'
         : 'Gagal mendapatkan saran AI. Coba lagi nanti.';
-      setSaranMap((prev) => ({ ...prev, [lahanId]: msg }));
+      const errorItem: SaranRiwayat = { id: Date.now(), saran: msg, created_at: new Date().toISOString() };
+      setSaranMap((prev) => ({
+        ...prev,
+        [lahanId]: [errorItem, ...(prev[lahanId] ?? [])],
+      }));
     } finally {
       setAiLoading(null);
     }
   };
 
+  const submitKeluhan = async (): Promise<void> => {
+    if (!keluhanModal || (!keluhanText.trim() && !keluhanImage)) return;
+    setKeluhanLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('lahan_id', String(keluhanModal.lahanId));
+      if (keluhanText.trim()) formData.append('keluhan', keluhanText.trim());
+      if (keluhanImage) formData.append('image', keluhanImage);
+
+      const res = await api.post<ApiResource<{ solusi: string }>>('/perawatan/keluhan', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setKeluhanResult(res.data.data.solusi);
+    } catch {
+      setKeluhanResult('Gagal mendapatkan solusi. Coba lagi nanti.');
+    } finally {
+      setKeluhanLoading(false);
+    }
+  };
+
+  const handleKeluhanImage = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setKeluhanImage(file);
+    setKeluhanImagePreview(URL.createObjectURL(file));
+  };
+
+  // Filtered + sorted data
+  const filteredData = useMemo(() => {
+    let result = data;
+    // Search
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      result = result.filter((i) => i.komoditas.toLowerCase().includes(q) || i.nomor_bed.toLowerCase().includes(q));
+    }
+    // Sort
+    const copy = [...result];
+    if (sortMode === 'urgency') {
+      copy.sort((a, b) => {
+        const aDays = a.terakhir_dipupuk ? daysSince(a.terakhir_dipupuk.tanggal) : 999;
+        const bDays = b.terakhir_dipupuk ? daysSince(b.terakhir_dipupuk.tanggal) : 999;
+        return bDays - aDays;
+      });
+    } else if (sortMode === 'recent') {
+      copy.sort((a, b) => {
+        const aDate = a.terakhir_dipupuk?.tanggal ?? '0';
+        const bDate = b.terakhir_dipupuk?.tanggal ?? '0';
+        return bDate.localeCompare(aDate);
+      });
+    } else {
+      copy.sort((a, b) => a.komoditas.localeCompare(b.komoditas, 'id'));
+    }
+    return copy;
+  }, [data, searchQuery, sortMode]);
+
   const groups = useMemo<PerawatanGroup[]>(() => {
     const map = new Map<string, PerawatanGroup>();
-    for (const item of data) {
+    for (const item of filteredData) {
       const key = item.komoditas.trim().toLowerCase();
       const existing = map.get(key);
       if (existing) existing.items.push(item);
       else map.set(key, { key, nama: item.komoditas.trim(), items: [item] });
     }
     return [...map.values()];
-  }, [data]);
+  }, [filteredData]);
 
   const renderCard = (item: PerawatanLahan): React.JSX.Element => {
     const isExpanded = expanded.has(item.lahan_id);
     const pupukDays = item.terakhir_dipupuk ? daysSince(item.terakhir_dipupuk.tanggal) : null;
     const pestDays = item.terakhir_dipestisida ? daysSince(item.terakhir_dipestisida.tanggal) : null;
+    const riwayat = saranMap[item.lahan_id] ?? [];
+    const hasSaran = riwayat.length > 0;
+    const latestSaran = riwayat[0];
 
     return (
       <div key={item.lahan_id} className="bg-white rounded-xl border border-slate-100 shadow-sm mb-3 overflow-hidden">
@@ -203,31 +352,88 @@ export default function PerawatanPage(): React.JSX.Element {
               )}
             </div>
 
-            <IonButton
-              expand="block"
-              fill="solid"
-              size="small"
-              color="primary"
-              className="mt-1 text-xs"
-              disabled={aiLoading === item.lahan_id}
-              onClick={() => void mintaSaran(item.lahan_id)}
-            >
-              {aiLoading === item.lahan_id ? (
-                <IonSpinner name="dots" className="w-4 h-4 mr-1" />
-              ) : (
-                <IonIcon icon={sparkles} slot="start" />
-              )}
-              <IonLabel>Minta Saran AI</IonLabel>
-            </IonButton>
-
-            {saranMap[item.lahan_id] && (
-              <div className="mt-3 p-3 bg-emerald-50 border border-emerald-100 rounded-lg">
-                <p className="text-[11px] font-semibold text-emerald-800 mb-1 flex items-center gap-1">
-                  <IonIcon icon={sparkles} className="text-sm" /> Rekomendasi AI
-                </p>
-                <p className="text-[11px] text-slate-700 whitespace-pre-line leading-relaxed">
-                  {saranMap[item.lahan_id]}
-                </p>
+            {/* Saran AI Section */}
+            {hasSaran ? (
+              <div className="mt-2">
+                {/* Saran terbaru */}
+                <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg mb-2">
+                  <p className="text-[11px] font-semibold text-emerald-800 mb-1 flex items-center gap-1">
+                    <IonIcon icon={sparkles} className="text-sm" /> Saran AI Terbaru
+                    <span className="ml-auto text-[10px] font-normal text-emerald-600">{formatDate(latestSaran.created_at)}</span>
+                  </p>
+                  <p className="text-[11px] text-slate-700 whitespace-pre-line leading-relaxed">
+                    {latestSaran.saran}
+                  </p>
+                </div>
+                {/* Action buttons */}
+                <div className="flex gap-2">
+                  <IonButton
+                    fill="outline"
+                    size="small"
+                    className="flex-1 text-xs"
+                    onClick={() => setRiwayatModal({ lahanId: item.lahan_id, komoditas: item.komoditas })}
+                  >
+                    <IonIcon icon={timeOutline} slot="start" />
+                    <IonLabel>Riwayat ({riwayat.length})</IonLabel>
+                  </IonButton>
+                  <IonButton
+                    fill="solid"
+                    size="small"
+                    color="primary"
+                    className="flex-1 text-xs"
+                    disabled={aiLoading === item.lahan_id}
+                    onClick={() => void generateSaran(item.lahan_id)}
+                  >
+                    {aiLoading === item.lahan_id ? (
+                      <IonSpinner name="dots" className="w-4 h-4 mr-1" />
+                    ) : (
+                      <IonIcon icon={refreshOutline} slot="start" />
+                    )}
+                    <IonLabel>Generate Baru</IonLabel>
+                  </IonButton>
+                </div>
+                {/* Lapor Keluhan */}
+                <IonButton
+                  expand="block"
+                  fill="outline"
+                  size="small"
+                  color="warning"
+                  className="mt-2 text-xs"
+                  onClick={() => { setKeluhanModal({ lahanId: item.lahan_id, komoditas: item.komoditas }); setKeluhanText(''); setKeluhanResult(null); setKeluhanImage(null); setKeluhanImagePreview(null); }}
+                >
+                  <IonIcon icon={alertCircleOutline} slot="start" />
+                  <IonLabel>Lapor Keluhan / Penyakit</IonLabel>
+                </IonButton>
+              </div>
+            ) : (
+              <div className="mt-1 space-y-2">
+                <IonButton
+                  expand="block"
+                  fill="solid"
+                  size="small"
+                  color="primary"
+                  className="text-xs"
+                  disabled={aiLoading === item.lahan_id}
+                  onClick={() => void generateSaran(item.lahan_id)}
+                >
+                  {aiLoading === item.lahan_id ? (
+                    <IonSpinner name="dots" className="w-4 h-4 mr-1" />
+                  ) : (
+                    <IonIcon icon={sparkles} slot="start" />
+                  )}
+                  <IonLabel>Minta Saran AI</IonLabel>
+                </IonButton>
+                <IonButton
+                  expand="block"
+                  fill="outline"
+                  size="small"
+                  color="warning"
+                  className="text-xs"
+                  onClick={() => { setKeluhanModal({ lahanId: item.lahan_id, komoditas: item.komoditas }); setKeluhanText(''); setKeluhanResult(null); setKeluhanImage(null); setKeluhanImagePreview(null); }}
+                >
+                  <IonIcon icon={alertCircleOutline} slot="start" />
+                  <IonLabel>Lapor Keluhan / Penyakit</IonLabel>
+                </IonButton>
               </div>
             )}
           </div>
@@ -240,7 +446,9 @@ export default function PerawatanPage(): React.JSX.Element {
     <IonPage>
       <IonHeader className="ion-no-border">
         <IonToolbar>
+          <IonButtons slot="start"><IonBackButton defaultHref="/app/tanaman" text="" /></IonButtons>
           <IonTitle className="font-semibold text-base">Perawatan</IonTitle>
+          <IonButtons slot="end"><SyncIndicator /></IonButtons>
         </IonToolbar>
       </IonHeader>
       <IonContent>
@@ -285,8 +493,17 @@ export default function PerawatanPage(): React.JSX.Element {
                 </div>
               </div>
 
-              {/* Toggle grouping */}
-              <div className="flex items-center mb-3">
+              {/* Search */}
+              <IonSearchbar
+                className="kbn-search"
+                placeholder="Cari komoditas atau bed..."
+                value={searchQuery}
+                onIonInput={(e) => setSearchQuery(e.detail.value ?? '')}
+                debounce={200}
+              />
+
+              {/* Toggle grouping & Sort */}
+              <div className="flex items-center gap-2 mb-3">
                 <button
                   type="button"
                   onClick={() => setGrouped((g) => !g)}
@@ -297,7 +514,15 @@ export default function PerawatanPage(): React.JSX.Element {
                   <IonIcon icon={layersOutline} className="text-sm" />
                   Kelompokkan
                 </button>
-                <span className="ml-auto text-[11px] text-slate-400 font-medium">{data.length} tanaman</span>
+                <button
+                  type="button"
+                  onClick={() => setSortSheet(true)}
+                  className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-dark"
+                >
+                  <IonIcon icon={swapVerticalOutline} className="text-sm" />
+                  {sortMode === 'urgency' ? 'Urgensi' : sortMode === 'recent' ? 'Terbaru' : 'A-Z'}
+                </button>
+                <span className="ml-auto text-[11px] text-slate-400 font-medium">{filteredData.length} tanaman</span>
               </div>
 
               {/* List: grouped or flat */}
@@ -323,12 +548,154 @@ export default function PerawatanPage(): React.JSX.Element {
                   );
                 })
               ) : (
-                data.map(renderCard)
+                filteredData.map(renderCard)
               )}
             </>
           )}
         </div>
       </IonContent>
+
+      {/* Modal Riwayat Saran AI */}
+      <IonModal
+        isOpen={riwayatModal !== null}
+        onDidDismiss={() => setRiwayatModal(null)}
+        initialBreakpoint={0.75}
+        breakpoints={[0, 0.5, 0.75, 1]}
+      >
+        <IonContent className="ion-padding">
+          <p className="text-sm font-bold text-slate-800 mb-1">
+            Riwayat Saran AI
+          </p>
+          <p className="text-[11px] text-slate-500 mb-4">{riwayatModal?.komoditas}</p>
+          {riwayatModal && (saranMap[riwayatModal.lahanId] ?? []).length === 0 ? (
+            <p className="text-[11px] text-slate-400 text-center py-6">Belum ada riwayat saran.</p>
+          ) : (
+            <div className="space-y-3">
+              {riwayatModal && (saranMap[riwayatModal.lahanId] ?? []).map((item, idx) => (
+                <div key={item.id} className={`p-3 rounded-lg border ${idx === 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-100'}`}>
+                  <p className="text-[10px] text-slate-500 mb-1 flex items-center gap-1">
+                    <IonIcon icon={calendarOutline} className="text-xs" />
+                    {formatDate(item.created_at)}
+                    {idx === 0 && <span className="ml-1 text-emerald-700 font-semibold">Terbaru</span>}
+                  </p>
+                  <p className="text-[11px] text-slate-700 whitespace-pre-line leading-relaxed">{item.saran}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </IonContent>
+      </IonModal>
+      {/* Sort ActionSheet */}
+      <IonActionSheet
+        isOpen={sortSheet}
+        onDidDismiss={() => setSortSheet(false)}
+        header="Urutkan"
+        buttons={[
+          { text: 'Urgensi (belum lama dipupuk)', handler: () => setSortMode('urgency') },
+          { text: 'Terbaru dipupuk', handler: () => setSortMode('recent') },
+          { text: 'A → Z', handler: () => setSortMode('az') },
+          { text: 'Batal', role: 'cancel' },
+        ]}
+      />
+
+      {/* Modal Keluhan / Penyakit */}
+      <IonModal
+        isOpen={keluhanModal !== null}
+        onDidDismiss={() => { setKeluhanModal(null); setKeluhanResult(null); setKeluhanImage(null); setKeluhanImagePreview(null); }}
+        initialBreakpoint={0.85}
+        breakpoints={[0, 0.85, 1]}
+      >
+        <IonContent className="ion-padding">
+          <p className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-1.5">
+            <IonIcon icon={alertCircleOutline} className="text-amber-600" />
+            Lapor Keluhan / Penyakit
+          </p>
+          <p className="text-[11px] text-slate-500 mb-3">{keluhanModal?.komoditas}</p>
+
+          {!keluhanResult ? (
+            <>
+              <IonTextarea
+                placeholder="Jelaskan keluhan atau gejala penyakit yang terlihat... (misal: daun menguning, ada bercak coklat, batang membusuk)"
+                value={keluhanText}
+                onIonInput={(e) => setKeluhanText(e.detail.value ?? '')}
+                rows={3}
+                className="border border-slate-200 rounded-lg text-sm"
+              />
+
+              {/* Image upload */}
+              <div className="mt-3">
+                <label className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 p-3 cursor-pointer hover:bg-slate-50 transition-colors">
+                  <IonIcon icon={cameraOutline} className="text-xl text-slate-500" />
+                  <span className="text-[12px] text-slate-600 font-medium">
+                    {keluhanImage ? 'Ganti foto' : 'Ambil / Upload foto tanaman'}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleKeluhanImage}
+                    className="hidden"
+                  />
+                </label>
+                {keluhanImagePreview && (
+                  <div className="mt-2 relative">
+                    <img src={keluhanImagePreview} alt="Preview" className="w-full h-40 object-cover rounded-lg border border-slate-200" />
+                    <button
+                      type="button"
+                      onClick={() => { setKeluhanImage(null); setKeluhanImagePreview(null); }}
+                      className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                    >✕</button>
+                  </div>
+                )}
+              </div>
+
+              <IonButton
+                expand="block"
+                color="primary"
+                className="mt-3"
+                disabled={keluhanLoading || (!keluhanText.trim() && !keluhanImage)}
+                onClick={() => void submitKeluhan()}
+              >
+                {keluhanLoading ? (
+                  <IonSpinner name="dots" className="w-4 h-4 mr-2" />
+                ) : (
+                  <IonIcon icon={sparkles} slot="start" />
+                )}
+                <IonLabel>{keluhanLoading ? 'Menganalisis...' : keluhanImage ? 'Analisis Foto + AI' : 'Minta Solusi AI'}</IonLabel>
+              </IonButton>
+            </>
+          ) : (
+            <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg">
+              <p className="text-[11px] font-semibold text-amber-800 mb-1">Keluhan:</p>
+              <p className="text-[11px] text-slate-600 mb-2 italic">{keluhanText || '[Foto tanaman]'}</p>
+              {keluhanImagePreview && (
+                <img src={keluhanImagePreview} alt="Foto keluhan" className="w-full h-32 object-cover rounded-lg mb-3 border" />
+              )}
+              <p className="text-[11px] font-semibold text-emerald-800 mb-1 flex items-center gap-1">
+                <IonIcon icon={sparkles} className="text-sm" /> Solusi AI:
+              </p>
+              <p className="text-[11px] text-slate-700 whitespace-pre-line leading-relaxed">{keluhanResult}</p>
+              <IonButton
+                expand="block"
+                fill="outline"
+                size="small"
+                className="mt-3"
+                onClick={() => { setKeluhanResult(null); setKeluhanText(''); setKeluhanImage(null); setKeluhanImagePreview(null); }}
+              >
+                Lapor Keluhan Lain
+              </IonButton>
+            </div>
+          )}
+        </IonContent>
+      </IonModal>
+
+      <IonToast
+        isOpen={toast !== null}
+        message={toast ?? ''}
+        duration={3000}
+        onDidDismiss={() => setToast(null)}
+        color="success"
+      />
     </IonPage>
   );
 }

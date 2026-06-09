@@ -8,10 +8,10 @@ use App\Http\Resources\ChatSessionResource;
 use App\Models\ChatMessage;
 use App\Models\ChatSession;
 use App\Models\Lahan;
+use App\Services\GroqService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 
 class ChatController extends Controller
@@ -191,15 +191,12 @@ class ChatController extends Controller
             }
         }
 
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . config('services.groq.api_key'),
-            'Content-Type' => 'application/json',
-        ])->timeout(45)->post('https://api.groq.com/openai/v1/chat/completions', [
+        $response = app(GroqService::class)->chat([
             'model' => $useVision ? self::VISION_MODEL : self::TEXT_MODEL,
             'messages' => $messages,
             'temperature' => 0.7,
             'max_tokens' => 1024,
-        ]);
+        ], 45);
 
         if ($response->failed()) {
             return $response->status() === 429

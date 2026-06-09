@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { LahanStatus, AktivitasTipe, TransaksiTipe } from '../types';
+import type { LahanStatus, AktivitasTipe, TransaksiTipe, MusimStatus } from '../types';
 
 // Record lokal (IndexedDB) selaras dengan tabel MariaDB.
 // Dikunci oleh client_uuid; server_id diisi setelah sync sukses; _dirty = belum tersinkron.
@@ -9,6 +9,7 @@ export interface LahanLocal {
   server_id: number | null;
   nomor_bed: string;
   komoditas: string;
+  icon: string | null;
   status: LahanStatus;
   tanggal_tanam: string | null;
   catatan: string | null;
@@ -50,7 +51,38 @@ export interface TransaksiLocal {
   _dirty: 0 | 1;
 }
 
-export type SyncEntity = 'lahan' | 'aktivitas' | 'transaksi';
+export interface PanenLocal {
+  client_uuid: string;
+  server_id: number | null;
+  lahan_uuid: string;
+  lahan_server_id: number | null;
+  tanggal: string;
+  berat: string;
+  grade: string | null;
+  harga_jual: string | null;
+  pembeli: string | null;
+  catatan: string | null;
+  created_at: string;
+  updated_at: string;
+  _dirty: 0 | 1;
+}
+
+export interface MusimTanamLocal {
+  client_uuid: string;
+  server_id: number | null;
+  lahan_uuid: string;
+  lahan_server_id: number | null;
+  komoditas: string;
+  tanggal_mulai: string;
+  tanggal_selesai: string | null;
+  status: MusimStatus;
+  catatan: string | null;
+  created_at: string;
+  updated_at: string;
+  _dirty: 0 | 1;
+}
+
+export type SyncEntity = 'lahan' | 'aktivitas' | 'transaksi' | 'panen' | 'musim_tanam';
 export type SyncOp = 'create' | 'update' | 'delete';
 export type SyncStatus = 'pending' | 'failed';
 
@@ -70,14 +102,18 @@ class KebunkuDB extends Dexie {
   lahan!: Table<LahanLocal, string>;
   aktivitas!: Table<AktivitasLocal, string>;
   transaksi!: Table<TransaksiLocal, string>;
+  panen!: Table<PanenLocal, string>;
+  musim_tanam!: Table<MusimTanamLocal, string>;
   sync_queue!: Table<SyncItem, number>;
 
   constructor() {
     super('kebunku');
-    this.version(2).stores({
+    this.version(3).stores({
       lahan: 'client_uuid, server_id, status, _dirty',
       aktivitas: 'client_uuid, server_id, lahan_uuid, tanggal, _dirty',
       transaksi: 'client_uuid, server_id, tipe, tanggal, _dirty',
+      panen: 'client_uuid, server_id, lahan_uuid, tanggal, _dirty',
+      musim_tanam: 'client_uuid, server_id, lahan_uuid, status, _dirty',
       sync_queue: '++id, entity, op, client_uuid, status, created_at',
     });
   }
@@ -91,6 +127,8 @@ export async function clearLocalData(): Promise<void> {
     db.lahan.clear(),
     db.aktivitas.clear(),
     db.transaksi.clear(),
+    db.panen.clear(),
+    db.musim_tanam.clear(),
     db.sync_queue.clear(),
   ]);
 }

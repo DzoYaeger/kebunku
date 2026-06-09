@@ -14,6 +14,7 @@ import {
   IonSegment,
   IonSegmentButton,
   IonLabel,
+  IonModal,
   useIonViewWillEnter,
 } from '@ionic/react';
 import {
@@ -24,10 +25,12 @@ import {
   addCircle,
   removeCircle,
   statsChartOutline,
+  downloadOutline,
 } from 'ionicons/icons';
 import type { TransaksiLocal, LahanLocal } from '../../db';
 import { transaksiRepo, lahanRepo, type TransaksiInput } from '../../db/repository';
 import { runSync } from '../../sync/SyncEngine';
+import { api } from '../../api/client';
 import { hydrateFromServer } from '../../sync/hydrate';
 import { useSyncStore } from '../../store/syncStore';
 import { SyncIndicator } from '../../components/SyncIndicator';
@@ -36,6 +39,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { CardSkeleton } from '../../components/CardSkeleton';
 import { TransaksiItem } from './TransaksiItem';
 import { TransaksiFormModal } from './TransaksiFormModal';
+import { CommodityAvatar } from '../../components/CommodityAvatar';
 import { formatRupiah } from '../../utils/format';
 
 type FilterTipe = 'semua' | 'kas_masuk' | 'kas_keluar';
@@ -50,9 +54,11 @@ export default function KeuanganPage(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalDefaultTipe, setModalDefaultTipe] = useState<'kas_masuk' | 'kas_keluar'>('kas_masuk');
+  const [editingTransaksi, setEditingTransaksi] = useState<TransaksiLocal | null>(null);
   const [filter, setFilter] = useState<FilterTipe>('semua');
   const [toast, setToast] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<TransaksiLocal | null>(null);
+  const [detailModal, setDetailModal] = useState<{ title: string; items: TransaksiLocal[] } | null>(null);
   const refreshCounts = useSyncStore((s) => s.refreshCounts);
 
   const reload = useCallback(async (): Promise<void> => {
@@ -103,12 +109,34 @@ export default function KeuanganPage(): React.JSX.Element {
   }, [items]);
 
   const openModal = (tipe: 'kas_masuk' | 'kas_keluar'): void => {
+    setEditingTransaksi(null);
     setModalDefaultTipe(tipe);
     setModalOpen(true);
   };
 
+  const openEdit = (t: TransaksiLocal): void => {
+    setEditingTransaksi(t);
+    setModalDefaultTipe(t.tipe);
+    setModalOpen(true);
+  };
+
+  const showKomoditasDetail = (komoditas: string): void => {
+    const filtered = items.filter((t) => t.tipe === 'kas_masuk' && t.komoditas?.toLowerCase() === komoditas.toLowerCase());
+    setDetailModal({ title: `Penjualan: ${komoditas}`, items: filtered });
+  };
+
+  const showKategoriDetail = (kategori: string): void => {
+    const filtered = items.filter((t) => t.tipe === 'kas_keluar' && t.kategori.toLowerCase() === kategori.toLowerCase());
+    setDetailModal({ title: `Pengeluaran: ${kategori}`, items: filtered });
+  };
+
   const handleSubmit = async (input: TransaksiInput): Promise<void> => {
-    await transaksiRepo.create(input);
+    if (editingTransaksi) {
+      await transaksiRepo.update(editingTransaksi.client_uuid, input);
+    } else {
+      await transaksiRepo.create(input);
+    }
+    setEditingTransaksi(null);
     await reload();
     await refreshCounts();
     if (navigator.onLine) void runSync().then(reload);
@@ -125,6 +153,20 @@ export default function KeuanganPage(): React.JSX.Element {
     else setToast(OFFLINE_MSG);
   };
 
+  const handleExport = async (): Promise<void> => {
+    try {
+      const res = await api.get('/export/transaksi', { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'export_transaksi_kebunku.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setToast('Gagal mengunduh export. Pastikan perangkat online.');
+    }
+  };
+
   return (
     <IonPage>
       <IonHeader className="ion-no-border">
@@ -134,6 +176,9 @@ export default function KeuanganPage(): React.JSX.Element {
           </IonButtons>
           <IonTitle>Keuangan</IonTitle>
           <IonButtons slot="end">
+            <button type="button" onClick={() => { void handleExport(); }} className="mr-3 text-slate-500 hover:text-slate-800">
+              <IonIcon icon={downloadOutline} className="text-xl" />
+            </button>
             <SyncIndicator />
           </IonButtons>
         </IonToolbar>
@@ -227,16 +272,19 @@ export default function KeuanganPage(): React.JSX.Element {
                     </span>
                   </div>
                   <div className="space-y-3">
-                    {ringkasanKomoditas.map(({ komoditas, total, jumlah }, idx) => {
+                    {ringkasanKomoditas.map(({ komoditas, total, jumlah }) => {
                       const maxTotal = ringkasanKomoditas[0]?.total ?? 1;
                       const pct = (total / maxTotal) * 100;
                       return (
-                        <div key={komoditas} className="group">
+                        <button
+                          type="button"
+                          key={komoditas}
+                          className="group w-full text-left"
+                          onClick={() => showKomoditasDetail(komoditas)}
+                        >
                           <div className="flex items-center justify-between mb-1.5">
                             <div className="flex items-center gap-2">
-                              <span className="w-5 h-5 rounded-md bg-[#DCFCE7] flex items-center justify-center text-[0.6rem] font-bold text-[#15803D]">
-                                {idx + 1}
-                              </span>
+                              <CommodityAvatar komoditas={komoditas} className="!w-7 !h-7 !text-base !rounded-lg" />
                               <span className="text-[0.82rem] capitalize text-slate-dark font-semibold">{komoditas}</span>
                             </div>
                             <div className="text-right">
@@ -253,7 +301,7 @@ export default function KeuanganPage(): React.JSX.Element {
                               }}
                             />
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -273,7 +321,12 @@ export default function KeuanganPage(): React.JSX.Element {
                     {byKategori.map(([kat, total]) => {
                       const pct = saldo.total_kas_keluar > 0 ? (total / saldo.total_kas_keluar) * 100 : 0;
                       return (
-                        <div key={kat}>
+                        <button
+                          type="button"
+                          key={kat}
+                          className="w-full text-left"
+                          onClick={() => showKategoriDetail(kat)}
+                        >
                           <div className="flex justify-between text-[0.78rem] mb-1.5">
                             <span className="capitalize text-slate-dark font-medium">{kat}</span>
                             <span className="text-[#b91c1c] font-semibold">{formatRupiah(total)}</span>
@@ -287,7 +340,7 @@ export default function KeuanganPage(): React.JSX.Element {
                               }}
                             />
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -335,7 +388,7 @@ export default function KeuanganPage(): React.JSX.Element {
                 ) : (
                   <div className="kbn-stagger">
                     {filteredItems.map((t) => (
-                      <TransaksiItem key={t.client_uuid} transaksi={t} onDelete={setToDelete} />
+                      <TransaksiItem key={t.client_uuid} transaksi={t} onDelete={setToDelete} onEdit={openEdit} />
                     ))}
                   </div>
                 )}
@@ -349,7 +402,8 @@ export default function KeuanganPage(): React.JSX.Element {
           defaultTipe={modalDefaultTipe}
           lahanOptions={lahanOptions}
           komoditasList={komoditasList}
-          onClose={() => setModalOpen(false)}
+          editing={editingTransaksi}
+          onClose={() => { setModalOpen(false); setEditingTransaksi(null); }}
           onSubmit={handleSubmit}
         />
 
@@ -371,6 +425,28 @@ export default function KeuanganPage(): React.JSX.Element {
           onDidDismiss={() => setToast(null)}
           color="medium"
         />
+
+        {/* Detail breakdown modal */}
+        <IonModal
+          isOpen={detailModal !== null}
+          onDidDismiss={() => setDetailModal(null)}
+          initialBreakpoint={0.65}
+          breakpoints={[0, 0.65, 0.9]}
+        >
+          <IonContent className="ion-padding">
+            <p className="text-sm font-bold text-slate-800 mb-1">{detailModal?.title}</p>
+            <p className="text-[11px] text-slate-500 mb-3">{detailModal?.items.length} transaksi</p>
+            {detailModal?.items.length === 0 ? (
+              <p className="text-center text-slate-400 text-[11px] py-6">Tidak ada data.</p>
+            ) : (
+              <div className="space-y-2">
+                {detailModal?.items.map((t) => (
+                  <TransaksiItem key={t.client_uuid} transaksi={t} onDelete={setToDelete} onEdit={openEdit} />
+                ))}
+              </div>
+            )}
+          </IonContent>
+        </IonModal>
       </IonContent>
     </IonPage>
   );

@@ -1,7 +1,7 @@
 import { api, isNetworkError } from '../api/client';
 import { db, type SyncItem } from '../db';
 import { useSyncStore } from '../store/syncStore';
-import type { ApiResource, Lahan, Aktivitas, Transaksi } from '../types';
+import type { ApiResource, Lahan, Aktivitas, Transaksi, Panen, MusimTanam } from '../types';
 
 // Batas percobaan ulang sebelum item ditandai gagal (mencegah retry tak terbatas).
 const MAX_ATTEMPTS = 8;
@@ -91,6 +91,53 @@ async function processItem(item: SyncItem): Promise<void> {
     const local = await db.transaksi.get(client_uuid);
     if (local) {
       await db.transaksi.put({ ...local, server_id: server.id, _dirty: 0 });
+    }
+    return;
+  }
+
+  if (entity === 'panen') {
+    const lahanServerId = await resolveLahanServerId(payload.lahan_uuid as string);
+    if (!lahanServerId) {
+      throw new Error('PENDING_DEPENDENCY: lahan belum tersinkron');
+    }
+    const body = {
+      client_uuid: payload.client_uuid,
+      lahan_id: lahanServerId,
+      tanggal: payload.tanggal,
+      berat: payload.berat,
+      grade: payload.grade,
+      harga_jual: payload.harga_jual,
+      pembeli: payload.pembeli,
+      catatan: payload.catatan,
+    };
+    const res = await api.post<ApiResource<Panen>>('/panen', body);
+    const server = res.data.data;
+    const local = await db.panen.get(client_uuid);
+    if (local) {
+      await db.panen.put({ ...local, server_id: server.id, lahan_server_id: lahanServerId, _dirty: 0 });
+    }
+    return;
+  }
+
+  if (entity === 'musim_tanam') {
+    const lahanServerId = await resolveLahanServerId(payload.lahan_uuid as string);
+    if (!lahanServerId) {
+      throw new Error('PENDING_DEPENDENCY: lahan belum tersinkron');
+    }
+    const body = {
+      client_uuid: payload.client_uuid,
+      lahan_id: lahanServerId,
+      komoditas: payload.komoditas,
+      tanggal_mulai: payload.tanggal_mulai,
+      tanggal_selesai: payload.tanggal_selesai,
+      status: payload.status,
+      catatan: payload.catatan,
+    };
+    const res = await api.post<ApiResource<MusimTanam>>('/musim-tanam', body);
+    const server = res.data.data;
+    const local = await db.musim_tanam.get(client_uuid);
+    if (local) {
+      await db.musim_tanam.put({ ...local, server_id: server.id, lahan_server_id: lahanServerId, _dirty: 0 });
     }
     return;
   }

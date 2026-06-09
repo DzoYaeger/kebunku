@@ -12,14 +12,14 @@ import {
 } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import {
+  pieChart,
+  pieChartOutline,
+  calendar,
+  calendarOutline,
   leaf,
   leafOutline,
-  documentText,
-  documentTextOutline,
   wallet,
   walletOutline,
-  medkit,
-  medkitOutline,
   chatbubbleEllipses,
 } from 'ionicons/icons';
 
@@ -32,6 +32,8 @@ import { UNAUTHORIZED_EVENT } from './api/token';
 
 import Login from './pages/Login';
 import Register from './pages/Register';
+import DashboardPage from './pages/Dashboard/DashboardPage';
+import KalenderPage from './pages/Dashboard/KalenderPage';
 import LahanListPage from './pages/Lahan/LahanListPage';
 import TanamanDetailPage from './pages/Lahan/TanamanDetailPage';
 import AktivitasListPage from './pages/Aktivitas/AktivitasListPage';
@@ -40,14 +42,18 @@ import PerawatanPage from './pages/Perawatan/PerawatanPage';
 import SettingsPage from './pages/Settings/SettingsPage';
 import ChatListPage from './pages/Chat/ChatListPage';
 import ChatRoomPage from './pages/Chat/ChatRoomPage';
+import PanenListPage from './pages/Panen/PanenListPage';
 
-// Shell tab utama (Lahan / Aktivitas / Keuangan) — design-system.md.
+// Shell tab utama
 function MainTabs(): React.JSX.Element {
   return (
     <IonTabs>
       <IonRouterOutlet>
+        <Route exact path="/app/dashboard" component={DashboardPage} />
+        <Route exact path="/app/kalender" component={KalenderPage} />
         <Route exact path="/app/tanaman" component={LahanListPage} />
         <Route exact path="/app/tanaman/:uuid" component={TanamanDetailPage} />
+        <Route exact path="/app/panen" component={PanenListPage} />
         <Route exact path="/app/aktivitas" component={AktivitasListPage} />
         <Route exact path="/app/keuangan" component={KeuanganPage} />
         <Route exact path="/app/perawatan" component={PerawatanPage} />
@@ -55,19 +61,19 @@ function MainTabs(): React.JSX.Element {
         <Route exact path="/app/chat" component={ChatListPage} />
         <Route exact path="/app/chat/:id" component={ChatRoomPage} />
         <Route exact path="/app">
-          <Redirect to="/app/tanaman" />
+          <Redirect to="/app/dashboard" />
         </Route>
       </IonRouterOutlet>
       <IonTabBar slot="bottom" className="kbn-tabbar">
+        <IonTabButton tab="dashboard" href="/app/dashboard">
+          <IonIcon aria-hidden="true" className="icon-inactive" icon={pieChartOutline} />
+          <IonIcon aria-hidden="true" className="icon-active" icon={pieChart} />
+          <IonLabel>Ringkasan</IonLabel>
+        </IonTabButton>
         <IonTabButton tab="tanaman" href="/app/tanaman">
           <IonIcon aria-hidden="true" className="icon-inactive" icon={leafOutline} />
           <IonIcon aria-hidden="true" className="icon-active" icon={leaf} />
           <IonLabel>Tanaman</IonLabel>
-        </IonTabButton>
-        <IonTabButton tab="perawatan" href="/app/perawatan">
-          <IonIcon aria-hidden="true" className="icon-inactive" icon={medkitOutline} />
-          <IonIcon aria-hidden="true" className="icon-active" icon={medkit} />
-          <IonLabel>Perawatan</IonLabel>
         </IonTabButton>
         <IonTabButton tab="chat" href="/app/chat" className="kbn-tab-center">
           <div className="kbn-fab-chat">
@@ -80,10 +86,10 @@ function MainTabs(): React.JSX.Element {
           <IonIcon aria-hidden="true" className="icon-active" icon={wallet} />
           <IonLabel>Keuangan</IonLabel>
         </IonTabButton>
-        <IonTabButton tab="aktivitas" href="/app/aktivitas">
-          <IonIcon aria-hidden="true" className="icon-inactive" icon={documentTextOutline} />
-          <IonIcon aria-hidden="true" className="icon-active" icon={documentText} />
-          <IonLabel>Aktivitas</IonLabel>
+        <IonTabButton tab="kalender" href="/app/kalender">
+          <IonIcon aria-hidden="true" className="icon-inactive" icon={calendarOutline} />
+          <IonIcon aria-hidden="true" className="icon-active" icon={calendar} />
+          <IonLabel>Kalender</IonLabel>
         </IonTabButton>
       </IonTabBar>
     </IonTabs>
@@ -148,7 +154,7 @@ export default function App(): React.JSX.Element {
             {isAuth ? <MainTabs /> : <Redirect to="/login" />}
           </Route>
           <Route exact path="/">
-            <Redirect to={isAuth ? '/app/tanaman' : '/login'} />
+            <Redirect to={isAuth ? '/app/dashboard' : '/login'} />
           </Route>
         </IonRouterOutlet>
       </IonReactRouter>

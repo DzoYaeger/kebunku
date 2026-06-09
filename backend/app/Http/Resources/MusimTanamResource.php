@@ -6,9 +6,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * @mixin \App\Models\Lahan
+ * @mixin \App\Models\MusimTanam
  */
-class LahanResource extends JsonResource
+class MusimTanamResource extends JsonResource
 {
     /**
      * @return array<string, mixed>
@@ -18,11 +18,18 @@ class LahanResource extends JsonResource
         return [
             'id' => $this->id,
             'client_uuid' => $this->client_uuid,
-            'nomor_bed' => $this->nomor_bed,
+            'lahan_id' => $this->lahan_id,
+            'lahan' => $this->whenLoaded('lahan', fn () => [
+                'id' => $this->lahan?->id,
+                'nomor_bed' => $this->lahan?->nomor_bed,
+                'komoditas' => $this->lahan?->komoditas,
+                'icon' => $this->lahan?->icon,
+                'status' => $this->lahan?->status,
+            ]),
             'komoditas' => $this->komoditas,
-            'icon' => $this->icon,
+            'tanggal_mulai' => $this->tanggal_mulai?->format('Y-m-d'),
+            'tanggal_selesai' => $this->tanggal_selesai?->format('Y-m-d'),
             'status' => $this->status,
-            'tanggal_tanam' => $this->tanggal_tanam,
             'catatan' => $this->catatan,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),

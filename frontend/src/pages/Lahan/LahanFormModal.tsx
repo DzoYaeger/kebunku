@@ -15,7 +15,7 @@ import {
 import type { LahanLocal } from '../../db';
 import type { LahanInput } from '../../db/repository';
 import type { LahanStatus } from '../../types';
-import { CommodityAvatar } from '../../components/CommodityAvatar';
+import { CommodityAvatar, EMOJI_OPTIONS } from '../../components/CommodityAvatar';
 
 interface Props {
   isOpen: boolean;
@@ -35,6 +35,7 @@ export function LahanFormModal({
 }: Props): React.JSX.Element {
   const [nomorBed, setNomorBed] = useState('');
   const [komoditas, setKomoditas] = useState('');
+  const [icon, setIcon] = useState<string | null>(null);
   const [status, setStatus] = useState<LahanStatus>('semai');
   const [tanggalTanam, setTanggalTanam] = useState('');
   const [catatan, setCatatan] = useState('');
@@ -44,6 +45,7 @@ export function LahanFormModal({
     if (isOpen) {
       setNomorBed(editing?.nomor_bed ?? '');
       setKomoditas(editing?.komoditas ?? '');
+      setIcon(editing?.icon ?? null);
       setStatus(editing?.status ?? 'semai');
       setTanggalTanam(editing?.tanggal_tanam ?? '');
       setCatatan(editing?.catatan ?? '');
@@ -58,6 +60,7 @@ export function LahanFormModal({
         {
           nomor_bed: nomorBed.trim(),
           komoditas: komoditas.trim(),
+          icon,
           status,
           tanggal_tanam: tanggalTanam || null,
           catatan: catatan.trim() || null,
@@ -119,6 +122,25 @@ export function LahanFormModal({
               </div>
             </div>
           )}
+
+          {/* Icon picker */}
+          <div>
+            <p className="text-caption text-slate-muted mb-2">Pilih ikon (opsional)</p>
+            <div className="flex flex-wrap gap-1.5">
+              {EMOJI_OPTIONS.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => setIcon(icon === e ? null : e)}
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center text-lg transition-all ${
+                    icon === e ? 'bg-emerald-100 border-2 border-emerald-500 scale-110' : 'bg-slate-50 border border-slate-200'
+                  }`}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <IonInput
             label="Nomor Bed"

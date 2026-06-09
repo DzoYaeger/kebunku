@@ -19,6 +19,14 @@ const EMOJI_MAP: Array<{ keys: string[]; emoji: string }> = [
   { keys: ['paprika'], emoji: '🫑' },
 ];
 
+// Daftar emoji yang tersedia untuk dipilih user di form
+export const EMOJI_OPTIONS = [
+  '🌶️', '🍅', '🥬', '🍆', '🌽', '🥕', '🧅', '🥔', '🥒',
+  '🌾', '🍓', '🍈', '🍉', '🥦', '🍄', '🫑', '🌱', '🌿',
+  '🍀', '🌻', '🌸', '🍊', '🍋', '🍌', '🥭', '🍇', '🫘',
+  '🥜', '🌰', '🧄', '🥝', '🍑', '🍍', '🥥', '☕', '🍃',
+];
+
 const BG_PALETTE = [
   'bg-[#DCFCE7] text-[#15803D]',
   'bg-[#FEF3C7] text-[#B45309]',
@@ -44,13 +52,14 @@ function colorFor(name: string): string {
 
 interface Props {
   komoditas: string;
+  icon?: string | null;
   className?: string;
 }
 
-export function CommodityAvatar({ komoditas, className = '' }: Props): React.JSX.Element {
+export function CommodityAvatar({ komoditas, icon, className = '' }: Props): React.JSX.Element {
   return (
     <div className={`kbn-avatar ${colorFor(komoditas)} ${className}`} aria-hidden="true">
-      {emojiFor(komoditas)}
+      {icon || emojiFor(komoditas)}
     </div>
   );
 }

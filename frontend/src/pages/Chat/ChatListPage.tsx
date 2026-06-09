@@ -15,11 +15,13 @@ import {
   IonLabel,
   IonRefresher,
   IonRefresherContent,
+  IonButtons,
   useIonViewWillEnter,
   useIonRouter,
 } from '@ionic/react';
 import { chatbubblesOutline, addOutline, leafOutline, trashOutline, chatbubbleEllipses } from 'ionicons/icons';
 import { listSessions, createSession, deleteSession } from '../../api/chat';
+import { SyncIndicator } from '../../components/SyncIndicator';
 import type { ChatSession } from '../../types';
 
 export default function ChatListPage(): React.JSX.Element {
@@ -73,6 +75,7 @@ export default function ChatListPage(): React.JSX.Element {
       <IonHeader className="ion-no-border">
         <IonToolbar>
           <IonTitle className="font-semibold text-base">Konsultasi AI</IonTitle>
+          <IonButtons slot="end"><SyncIndicator /></IonButtons>
         </IonToolbar>
       </IonHeader>
       <IonContent>

@@ -4,7 +4,11 @@ use App\Http\Controllers\Api\AktivitasController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\CuacaController;
+use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\LahanController;
+use App\Http\Controllers\Api\MusimTanamController;
+use App\Http\Controllers\Api\PanenController;
 use App\Http\Controllers\Api\PerawatanController;
 use App\Http\Controllers\Api\TransaksiController;
 use Illuminate\Support\Facades\Route;
@@ -36,11 +40,33 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/transaksi', [TransaksiController::class, 'index']);
     Route::get('/transaksi/ringkasan-komoditas', [TransaksiController::class, 'ringkasanKomoditas']);
     Route::post('/transaksi', [TransaksiController::class, 'store']);
+    Route::put('/transaksi/{transaksi}', [TransaksiController::class, 'update']);
     Route::delete('/transaksi/{transaksi}', [TransaksiController::class, 'destroy']);
+
+    // Panen
+    Route::get('/panen', [PanenController::class, 'index']);
+    Route::get('/panen/profit-komoditas', [PanenController::class, 'profitKomoditas']);
+    Route::post('/panen', [PanenController::class, 'store']);
+    Route::delete('/panen/{panen}', [PanenController::class, 'destroy']);
+
+    // Musim Tanam
+    Route::get('/musim-tanam', [MusimTanamController::class, 'index']);
+    Route::post('/musim-tanam', [MusimTanamController::class, 'store']);
+    Route::put('/musim-tanam/{musimTanam}', [MusimTanamController::class, 'update']);
+    Route::delete('/musim-tanam/{musimTanam}', [MusimTanamController::class, 'destroy']);
+
+    // Dashboard & Analytics
+    Route::get('/dashboard', [DashboardController::class, 'index']);
+
+    // Export CSV
+    Route::get('/export/transaksi', [ExportController::class, 'exportTransaksi']);
+    Route::get('/export/panen', [ExportController::class, 'exportPanen']);
 
     // Perawatan
     Route::get('/perawatan', [PerawatanController::class, 'index']);
     Route::post('/perawatan/saran-ai', [PerawatanController::class, 'saranAi']);
+    Route::post('/perawatan/keluhan', [PerawatanController::class, 'keluhan']);
+    Route::get('/perawatan/saran-ai/{lahan}', [PerawatanController::class, 'riwayatSaran']);
 
     // Cuaca & Saran Harian
     Route::get('/cuaca', [CuacaController::class, 'index']);

@@ -18,7 +18,7 @@ import {
   IonIcon,
 } from '@ionic/react';
 import { trendingUpOutline, trendingDownOutline } from 'ionicons/icons';
-import type { LahanLocal } from '../../db';
+import type { LahanLocal, TransaksiLocal } from '../../db';
 import type { TransaksiInput } from '../../db/repository';
 import type { TransaksiTipe } from '../../types';
 
@@ -27,6 +27,7 @@ interface Props {
   defaultTipe: TransaksiTipe;
   lahanOptions: LahanLocal[];
   komoditasList: string[];
+  editing?: TransaksiLocal | null;
   onClose: () => void;
   onSubmit: (input: TransaksiInput) => Promise<void>;
 }
@@ -38,7 +39,7 @@ function today(): string {
 const KATEGORI_KELUAR = ['benih', 'pupuk', 'pestisida', 'upah', 'alat', 'lainnya'];
 const KATEGORI_MASUK = ['penjualan', 'lainnya'];
 
-export function TransaksiFormModal({ isOpen, defaultTipe, lahanOptions, komoditasList, onClose, onSubmit }: Props): React.JSX.Element {
+export function TransaksiFormModal({ isOpen, defaultTipe, lahanOptions, komoditasList, editing, onClose, onSubmit }: Props): React.JSX.Element {
   const [tipe, setTipe] = useState<TransaksiTipe>(defaultTipe);
   const [kategori, setKategori] = useState<string>('penjualan');
   const [komoditas, setKomoditas] = useState<string>('');
@@ -51,16 +52,26 @@ export function TransaksiFormModal({ isOpen, defaultTipe, lahanOptions, komodita
 
   useEffect(() => {
     if (isOpen) {
-      setTipe(defaultTipe);
-      setKategori(defaultTipe === 'kas_masuk' ? 'penjualan' : 'benih');
-      setKomoditas('');
-      setNominal('');
-      setTanggal(today());
-      setLahanUuid('');
-      setCatatan('');
+      if (editing) {
+        setTipe(editing.tipe);
+        setKategori(editing.kategori);
+        setKomoditas(editing.komoditas ?? '');
+        setNominal(editing.nominal);
+        setTanggal(editing.tanggal);
+        setLahanUuid(editing.lahan_uuid ?? '');
+        setCatatan(editing.catatan ?? '');
+      } else {
+        setTipe(defaultTipe);
+        setKategori(defaultTipe === 'kas_masuk' ? 'penjualan' : 'benih');
+        setKomoditas('');
+        setNominal('');
+        setTanggal(today());
+        setLahanUuid('');
+        setCatatan('');
+      }
       setError(null);
     }
-  }, [isOpen, defaultTipe]);
+  }, [isOpen, defaultTipe, editing]);
 
   useEffect(() => {
     setKategori(tipe === 'kas_masuk' ? 'penjualan' : 'benih');
@@ -101,7 +112,7 @@ export function TransaksiFormModal({ isOpen, defaultTipe, lahanOptions, komodita
       <IonHeader className="ion-no-border">
         <IonToolbar>
           <IonTitle className="text-[0.95rem] font-bold">
-            {isMasuk ? 'Catat Pemasukan' : 'Catat Pengeluaran'}
+            {editing ? 'Edit Transaksi' : isMasuk ? 'Catat Pemasukan' : 'Catat Pengeluaran'}
           </IonTitle>
           <IonButtons slot="end">
             <IonButton onClick={onClose} className="text-slate-muted">Tutup</IonButton>
@@ -234,7 +245,7 @@ export function TransaksiFormModal({ isOpen, defaultTipe, lahanOptions, komodita
                 : '0 8px 20px -6px rgba(225, 29, 72, 0.4)',
             } as React.CSSProperties}
           >
-            {saving ? 'Menyimpan…' : isMasuk ? '💰 Simpan Pemasukan' : '💸 Simpan Pengeluaran'}
+            {saving ? 'Menyimpan…' : editing ? '✏️ Simpan Perubahan' : isMasuk ? '💰 Simpan Pemasukan' : '💸 Simpan Pengeluaran'}
           </IonButton>
         </div>
       </IonContent>

@@ -43,6 +43,7 @@ class LahanRequest extends FormRequest
         $rules = [
             'nomor_bed' => ['required', 'string', 'max:255', $uniqueBed],
             'komoditas' => ['required', 'string', 'max:255'],
+            'icon' => ['nullable', 'string', 'max:10'],
             'status' => ['sometimes', Rule::in(['semai', 'aktif', 'selesai'])],
             'tanggal_tanam' => ['nullable', 'date'],
             'catatan' => ['nullable', 'string'],

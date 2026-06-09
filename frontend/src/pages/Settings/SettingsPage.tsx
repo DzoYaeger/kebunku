@@ -11,6 +11,7 @@ import {
   IonLabel,
   IonModal,
   IonButtons,
+  IonBackButton,
   IonButton,
   IonInput,
   IonText,
@@ -31,6 +32,7 @@ import {
 import { useAuthStore } from '../../store/authStore';
 import { useLocationStore, requestGpsLocation, geocodeCity } from '../../store/locationStore';
 import { isValidationError } from '../../api/client';
+import { SyncIndicator } from '../../components/SyncIndicator';
 import { useIonRouter, IonAlert } from '@ionic/react';
 
 type ModalType = 'profil' | 'password' | 'lokasi' | null;
@@ -150,7 +152,9 @@ export default function SettingsPage(): React.JSX.Element {
     <IonPage>
       <IonHeader className="ion-no-border">
         <IonToolbar>
+          <IonButtons slot="start"><IonBackButton defaultHref="/app/dashboard" text="" /></IonButtons>
           <IonTitle className="font-semibold text-base">Pengaturan</IonTitle>
+          <IonButtons slot="end"><SyncIndicator /></IonButtons>
         </IonToolbar>
       </IonHeader>
       <IonContent>

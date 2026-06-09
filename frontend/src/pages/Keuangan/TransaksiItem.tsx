@@ -1,6 +1,7 @@
 import { IonIcon } from '@ionic/react';
 import {
   trashOutline,
+  createOutline,
   cloudUploadOutline,
   leafOutline,
   flaskOutline,
@@ -32,9 +33,10 @@ function iconFor(kategori: string, isMasuk: boolean): string {
 interface Props {
   transaksi: TransaksiLocal;
   onDelete: (t: TransaksiLocal) => void;
+  onEdit?: (t: TransaksiLocal) => void;
 }
 
-export function TransaksiItem({ transaksi, onDelete }: Props): React.JSX.Element {
+export function TransaksiItem({ transaksi, onDelete, onEdit }: Props): React.JSX.Element {
   const isMasuk = transaksi.tipe === 'kas_masuk';
 
   return (
@@ -84,6 +86,17 @@ export function TransaksiItem({ transaksi, onDelete }: Props): React.JSX.Element
           {isMasuk ? '+' : '-'}{formatRupiah(transaksi.nominal)}
         </p>
       </div>
+
+      {/* Edit button */}
+      {onEdit && (
+        <button
+          type="button"
+          onClick={() => onEdit(transaksi)}
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-blue-500 hover:bg-blue-50 shrink-0 transition-colors"
+        >
+          <IonIcon icon={createOutline} className="text-sm" />
+        </button>
+      )}
 
       {/* Delete button */}
       <button

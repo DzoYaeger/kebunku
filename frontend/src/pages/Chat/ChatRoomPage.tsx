@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router';
 import {
   IonPage,
@@ -17,12 +17,15 @@ import {
   IonList,
   IonItem,
   IonLabel,
-  IonRadio,
-  IonRadioGroup,
+  IonCheckbox,
+  IonSearchbar,
+  useIonViewWillEnter,
+  useIonViewWillLeave,
 } from '@ionic/react';
-import { send, imageOutline, cameraOutline, leafOutline, closeCircle, sparkles, addCircleOutline } from 'ionicons/icons';
+import { send, imageOutline, cameraOutline, leafOutline, closeCircle, sparkles, atOutline, chevronDown, chevronUp } from 'ionicons/icons';
 import { getSession, sendMessage } from '../../api/chat';
 import { lahanRepo } from '../../db/repository';
+import { CommodityAvatar } from '../../components/CommodityAvatar';
 import type { LahanLocal } from '../../db';
 import type { ChatMessage, ChatSession } from '../../types';
 
@@ -41,11 +44,19 @@ export default function ChatRoomPage(): React.JSX.Element {
   // Lahan selector
   const [lahanList, setLahanList] = useState<LahanLocal[]>([]);
   const [showLahanModal, setShowLahanModal] = useState(false);
-  const [selectedLahan, setSelectedLahan] = useState<LahanLocal | null>(null);
+  const [selectedLahan, setSelectedLahan] = useState<LahanLocal[]>([]);
 
   const galleryRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef<HTMLIonContentElement>(null);
+
+  // Hide tab bar saat masuk ChatRoom
+  useIonViewWillEnter(() => {
+    document.querySelector('ion-tabs')?.classList.add('hide-tab-bar');
+  });
+  useIonViewWillLeave(() => {
+    document.querySelector('ion-tabs')?.classList.remove('hide-tab-bar');
+  });
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => void contentRef.current?.scrollToBottom(300), 100);
@@ -60,7 +71,7 @@ export default function ChatRoomPage(): React.JSX.Element {
       setLahanList(lahan.filter((l) => l.server_id !== null));
       if (s.lahan) {
         const match = lahan.find((l) => l.server_id === s.lahan?.id);
-        if (match) setSelectedLahan(match);
+        if (match) setSelectedLahan([match]);
       }
       scrollToBottom();
     } catch { /* silent */ }
@@ -108,7 +119,7 @@ export default function ChatRoomPage(): React.JSX.Element {
     scrollToBottom();
 
     try {
-      const res = await sendMessage(sessionId, text, sentImage, selectedLahan?.server_id ?? null);
+      const res = await sendMessage(sessionId, text, sentImage, selectedLahan[0]?.server_id ?? null);
       setMessages((prev) => [
         ...prev.filter((m) => m.id !== tempId),
         res.user_message,
@@ -151,18 +162,6 @@ export default function ChatRoomPage(): React.JSX.Element {
             </div>
           ) : (
             <>
-              {/* Lahan context selector */}
-              <div className="flex justify-center mb-4">
-                <button
-                  type="button"
-                  onClick={() => setShowLahanModal(true)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700"
-                >
-                  <IonIcon icon={leafOutline} className="text-sm" />
-                  {selectedLahan ? `${selectedLahan.komoditas} (Bed ${selectedLahan.nomor_bed})` : 'Pilih tanaman (opsional)'}
-                </button>
-              </div>
-
               {messages.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-10 text-center">
                   <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center mb-3">
@@ -206,6 +205,20 @@ export default function ChatRoomPage(): React.JSX.Element {
 
       <IonFooter className="ion-no-border">
         <div className="bg-white border-t border-slate-100 px-3 py-2">
+          {/* Selected lahan badges */}
+          {selectedLahan.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {selectedLahan.map((l) => (
+                <span key={l.client_uuid} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                  <IonIcon icon={leafOutline} className="text-xs" />
+                  {l.komoditas} (Bed {l.nomor_bed})
+                  <button type="button" onClick={() => setSelectedLahan((prev) => prev.filter((x) => x.client_uuid !== l.client_uuid))}>
+                    <IonIcon icon={closeCircle} className="text-sm text-emerald-400" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           {/* Image preview */}
           {imagePreview && (
             <div className="relative inline-block mb-2">
@@ -216,6 +229,9 @@ export default function ChatRoomPage(): React.JSX.Element {
             </div>
           )}
           <div className="flex items-end gap-1.5">
+            <IonButton fill="clear" size="small" className="m-0" onClick={() => setShowLahanModal(true)}>
+              <IonIcon slot="icon-only" icon={atOutline} className="text-emerald-600" />
+            </IonButton>
             <IonButton fill="clear" size="small" className="m-0" onClick={() => galleryRef.current?.click()}>
               <IonIcon slot="icon-only" icon={imageOutline} className="text-slate-500" />
             </IonButton>
@@ -249,40 +265,181 @@ export default function ChatRoomPage(): React.JSX.Element {
         <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={onFileSelected} />
       </IonFooter>
 
-      {/* Lahan selector modal */}
-      <IonModal isOpen={showLahanModal} onDidDismiss={() => setShowLahanModal(false)} initialBreakpoint={0.6} breakpoints={[0, 0.6, 0.9]}>
-        <IonContent className="ion-padding">
-          <p className="text-sm font-semibold text-slate-700 mb-2">Pilih Tanaman</p>
-          <IonRadioGroup
-            value={selectedLahan?.client_uuid ?? ''}
-            onIonChange={(e) => {
-              const uuid = e.detail.value as string;
-              setSelectedLahan(lahanList.find((l) => l.client_uuid === uuid) ?? null);
-              setShowLahanModal(false);
-            }}
-          >
-            <IonList>
-              <IonItem button onClick={() => { setSelectedLahan(null); setShowLahanModal(false); }}>
-                <IonIcon icon={addCircleOutline} slot="start" className="text-slate-400" />
-                <IonLabel className="text-sm">Tanpa tanaman spesifik</IonLabel>
-              </IonItem>
-              {lahanList.map((l) => (
-                <IonItem key={l.client_uuid}>
-                  <IonIcon icon={leafOutline} slot="start" className="text-emerald-600" />
-                  <IonLabel className="text-sm">
-                    {l.komoditas}
-                    <p className="text-[11px] text-slate-400">Bed {l.nomor_bed}</p>
-                  </IonLabel>
-                  <IonRadio slot="end" value={l.client_uuid} />
-                </IonItem>
-              ))}
-            </IonList>
-          </IonRadioGroup>
-          <p className="text-[11px] text-slate-400 mt-2">
-            Tanaman yang dipilih akan menjadi konteks konsultasi AI mulai pesan berikutnya.
-          </p>
-        </IonContent>
+      {/* Lahan selector modal — multi-select with search, grouping, filter */}
+      <IonModal isOpen={showLahanModal} onDidDismiss={() => setShowLahanModal(false)} initialBreakpoint={0.7} breakpoints={[0, 0.7, 0.95]}>
+        <LahanSelectorContent
+          lahanList={lahanList}
+          selectedLahan={selectedLahan}
+          setSelectedLahan={setSelectedLahan}
+          onClose={() => setShowLahanModal(false)}
+        />
       </IonModal>
     </IonPage>
+  );
+}
+
+/* ─── Lahan Selector Sub-component ─── */
+interface SelectorProps {
+  lahanList: LahanLocal[];
+  selectedLahan: LahanLocal[];
+  setSelectedLahan: React.Dispatch<React.SetStateAction<LahanLocal[]>>;
+  onClose: () => void;
+}
+
+function LahanSelectorContent({ lahanList, selectedLahan, setSelectedLahan, onClose }: SelectorProps): React.JSX.Element {
+  const [search, setSearch] = useState('');
+  const [filterKomoditas, setFilterKomoditas] = useState<string | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  // Unique komoditas list for filter chips
+  const komoditasList = useMemo(() => {
+    const set = new Map<string, string>();
+    for (const l of lahanList) {
+      const key = l.komoditas.trim().toLowerCase();
+      if (!set.has(key)) set.set(key, l.komoditas.trim());
+    }
+    return [...set.values()].sort((a, b) => a.localeCompare(b, 'id'));
+  }, [lahanList]);
+
+  // Filtered list
+  const filtered = useMemo(() => {
+    let result = lahanList;
+    if (filterKomoditas) {
+      result = result.filter((l) => l.komoditas.trim().toLowerCase() === filterKomoditas.toLowerCase());
+    }
+    const q = search.trim().toLowerCase();
+    if (q) {
+      result = result.filter((l) => l.komoditas.toLowerCase().includes(q) || l.nomor_bed.toLowerCase().includes(q));
+    }
+    return result;
+  }, [lahanList, filterKomoditas, search]);
+
+  // Grouped
+  const groups = useMemo(() => {
+    const map = new Map<string, { nama: string; items: LahanLocal[] }>();
+    for (const l of filtered) {
+      const key = l.komoditas.trim().toLowerCase();
+      const existing = map.get(key);
+      if (existing) existing.items.push(l);
+      else map.set(key, { nama: l.komoditas.trim(), items: [l] });
+    }
+    return [...map.values()];
+  }, [filtered]);
+
+  const toggleGroup = (key: string): void => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  return (
+    <IonContent className="ion-padding">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm font-bold text-slate-800">Pilih Tanaman Konteks</p>
+        {selectedLahan.length > 0 && (
+          <button type="button" onClick={() => setSelectedLahan([])} className="text-[11px] text-red-500 font-medium">
+            Hapus semua
+          </button>
+        )}
+      </div>
+
+      {/* Search */}
+      <IonSearchbar
+        className="kbn-search"
+        placeholder="Cari tanaman atau bed..."
+        value={search}
+        onIonInput={(e) => setSearch(e.detail.value ?? '')}
+        debounce={150}
+      />
+
+      {/* Filter chips komoditas */}
+      {komoditasList.length > 1 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          <button
+            type="button"
+            onClick={() => setFilterKomoditas(null)}
+            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold border transition-colors ${
+              !filterKomoditas ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-600'
+            }`}
+          >
+            Semua
+          </button>
+          {komoditasList.map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setFilterKomoditas(filterKomoditas === k ? null : k)}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold border transition-colors flex items-center gap-1 ${
+                filterKomoditas === k ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-600'
+              }`}
+            >
+              <CommodityAvatar komoditas={k} className="!w-4 !h-4 !text-[10px] !rounded-full" />
+              {k}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Grouped list */}
+      {filtered.length === 0 ? (
+        <p className="text-center text-[11px] text-slate-400 py-6">Tidak ada tanaman ditemukan.</p>
+      ) : (
+        <div className="space-y-2">
+          {groups.map((g) => {
+            const key = g.nama.toLowerCase();
+            const isCollapsed = collapsedGroups.has(key);
+            return (
+              <div key={key}>
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(key)}
+                  className="flex items-center gap-2 w-full text-left px-1 py-1.5"
+                >
+                  <CommodityAvatar komoditas={g.nama} className="!w-7 !h-7 !text-sm !rounded-lg" />
+                  <span className="text-[13px] font-bold text-slate-700 flex-1">{g.nama}</span>
+                  <span className="text-[10px] text-slate-400 mr-1">{g.items.length}</span>
+                  <IonIcon icon={isCollapsed ? chevronDown : chevronUp} className="text-slate-400 text-sm" />
+                </button>
+                {!isCollapsed && (
+                  <IonList className="ml-2">
+                    {g.items.map((l) => {
+                      const isChecked = selectedLahan.some((s) => s.client_uuid === l.client_uuid);
+                      return (
+                        <IonItem key={l.client_uuid} lines="none" className="mb-0.5">
+                          <IonCheckbox
+                            slot="start"
+                            checked={isChecked}
+                            className="kbn-checkbox-lg"
+                            onIonChange={(e) => {
+                              if (e.detail.checked) {
+                                setSelectedLahan((prev) => [...prev, l]);
+                              } else {
+                                setSelectedLahan((prev) => prev.filter((x) => x.client_uuid !== l.client_uuid));
+                              }
+                            }}
+                          />
+                          <IonLabel>
+                            <p className="text-[13px] font-medium text-slate-800">Bed {l.nomor_bed}</p>
+                            <p className="text-[10px] text-slate-400">{l.status}</p>
+                          </IonLabel>
+                        </IonItem>
+                      );
+                    })}
+                  </IonList>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Done button */}
+      <IonButton expand="block" className="mt-4" onClick={onClose}>
+        Selesai ({selectedLahan.length} dipilih)
+      </IonButton>
+    </IonContent>
   );
 }

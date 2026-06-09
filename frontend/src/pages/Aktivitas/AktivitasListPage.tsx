@@ -5,6 +5,7 @@ import {
   IonToolbar,
   IonTitle,
   IonButtons,
+  IonBackButton,
   IonContent,
   IonIcon,
   IonSegment,
@@ -31,7 +32,6 @@ import { aktivitasRepo, transaksiRepo, lahanRepo } from '../../db/repository';
 import { hydrateFromServer } from '../../sync/hydrate';
 import { useSyncStore } from '../../store/syncStore';
 import { SyncIndicator } from '../../components/SyncIndicator';
-import { AccountButton } from '../../components/AccountButton';
 import { EmptyState } from '../../components/EmptyState';
 import { CardSkeleton } from '../../components/CardSkeleton';
 import { formatRupiah, formatTanggal } from '../../utils/format';
@@ -206,7 +206,7 @@ export default function AktivitasListPage(): React.JSX.Element {
     <IonPage>
       <IonHeader className="ion-no-border">
         <IonToolbar>
-          <IonButtons slot="start"><AccountButton /></IonButtons>
+          <IonButtons slot="start"><IonBackButton defaultHref="/app/dashboard" text="" /></IonButtons>
           <IonTitle>Aktivitas</IonTitle>
           <IonButtons slot="end"><SyncIndicator /></IonButtons>
         </IonToolbar>

@@ -3,6 +3,10 @@ import {
   type LahanLocal,
   type AktivitasLocal,
   type TransaksiLocal,
+  type PanenLocal,
+  type MusimTanamLocal,
+  type SyncEntity,
+  type SyncOp,
 } from './index';
 import { newClientUuid, nowIso } from './uuid';
 import type { LahanStatus, AktivitasTipe, TransaksiTipe } from '../types';
@@ -12,8 +16,8 @@ import type { LahanStatus, AktivitasTipe, TransaksiTipe } from '../types';
 // SyncEngine yang mengirim antrean ke server (idempoten via client_uuid).
 
 async function enqueue(
-  entity: 'lahan' | 'aktivitas' | 'transaksi',
-  op: 'create' | 'update' | 'delete',
+  entity: SyncEntity,
+  op: SyncOp,
   client_uuid: string,
   payload: Record<string, unknown>,
 ): Promise<void> {
@@ -34,6 +38,7 @@ async function enqueue(
 export interface LahanInput {
   nomor_bed: string;
   komoditas: string;
+  icon?: string | null;
   status?: LahanStatus;
   tanggal_tanam?: string | null;
   catatan?: string | null;
@@ -67,6 +72,7 @@ export const lahanRepo = {
       server_id: null,
       nomor_bed: input.nomor_bed,
       komoditas: input.komoditas,
+      icon: input.icon ?? null,
       status: input.status ?? 'semai',
       tanggal_tanam: input.tanggal_tanam ?? null,
       catatan: input.catatan ?? null,
@@ -79,6 +85,7 @@ export const lahanRepo = {
       client_uuid: record.client_uuid,
       nomor_bed: record.nomor_bed,
       komoditas: record.komoditas,
+      icon: record.icon,
       status: record.status,
       tanggal_tanam: record.tanggal_tanam,
       catatan: record.catatan,
@@ -93,6 +100,7 @@ export const lahanRepo = {
       ...existing,
       nomor_bed: input.nomor_bed,
       komoditas: input.komoditas,
+      icon: input.icon ?? existing.icon,
       status: input.status ?? existing.status,
       tanggal_tanam: input.tanggal_tanam ?? existing.tanggal_tanam,
       catatan: input.catatan ?? null,
@@ -106,6 +114,7 @@ export const lahanRepo = {
         server_id: updated.server_id,
         nomor_bed: updated.nomor_bed,
         komoditas: updated.komoditas,
+        icon: updated.icon,
         status: updated.status,
         tanggal_tanam: updated.tanggal_tanam,
         catatan: updated.catatan,
@@ -272,6 +281,186 @@ export const transaksiRepo = {
     await db.transaksi.delete(clientUuid);
     if (existing?.server_id) {
       await enqueue('transaksi', 'delete', clientUuid, { server_id: existing.server_id });
+    }
+  },
+
+  async update(clientUuid: string, input: TransaksiInput): Promise<TransaksiLocal> {
+    const existing = await db.transaksi.get(clientUuid);
+    if (!existing) throw new Error('Transaksi tidak ditemukan');
+    const updated: TransaksiLocal = {
+      ...existing,
+      tipe: input.tipe ?? existing.tipe,
+      kategori: input.kategori,
+      komoditas: input.komoditas ?? null,
+      nominal: input.nominal,
+      tanggal: input.tanggal,
+      catatan: input.catatan ?? null,
+      updated_at: nowIso(),
+      _dirty: 1,
+    };
+    await db.transaksi.put(updated);
+    if (updated.server_id) {
+      await enqueue('transaksi', 'update', clientUuid, {
+        server_id: updated.server_id,
+        tipe: updated.tipe,
+        kategori: updated.kategori,
+        komoditas: updated.komoditas,
+        nominal: updated.nominal,
+        tanggal: updated.tanggal,
+        catatan: updated.catatan,
+      });
+    }
+    return updated;
+  },
+};
+
+/* ----------------------------- PANEN ----------------------------- */
+
+export interface PanenInput {
+  lahan_uuid: string;
+  tanggal: string;
+  berat: string;
+  grade?: string | null;
+  harga_jual?: string | null;
+  pembeli?: string | null;
+  catatan?: string | null;
+}
+
+export const panenRepo = {
+  async list(): Promise<PanenLocal[]> {
+    const rows = await db.panen.toArray();
+    return rows.sort((a, b) => b.tanggal.localeCompare(a.tanggal) || b.created_at.localeCompare(a.created_at));
+  },
+
+  async listByLahan(lahanUuid: string): Promise<PanenLocal[]> {
+    const rows = await db.panen.where('lahan_uuid').equals(lahanUuid).toArray();
+    return rows.sort((a, b) => b.tanggal.localeCompare(a.tanggal) || b.created_at.localeCompare(a.created_at));
+  },
+
+  async create(input: PanenInput): Promise<PanenLocal> {
+    const ts = nowIso();
+    const lahan = await db.lahan.get(input.lahan_uuid);
+    const record: PanenLocal = {
+      client_uuid: newClientUuid(),
+      server_id: null,
+      lahan_uuid: input.lahan_uuid,
+      lahan_server_id: lahan?.server_id ?? null,
+      tanggal: input.tanggal,
+      berat: input.berat,
+      grade: input.grade ?? null,
+      harga_jual: input.harga_jual ?? null,
+      pembeli: input.pembeli ?? null,
+      catatan: input.catatan ?? null,
+      created_at: ts,
+      updated_at: ts,
+      _dirty: 1,
+    };
+    await db.panen.put(record);
+    await enqueue('panen', 'create', record.client_uuid, {
+      client_uuid: record.client_uuid,
+      lahan_uuid: record.lahan_uuid,
+      tanggal: record.tanggal,
+      berat: record.berat,
+      grade: record.grade,
+      harga_jual: record.harga_jual,
+      pembeli: record.pembeli,
+      catatan: record.catatan,
+    });
+    return record;
+  },
+
+  async remove(clientUuid: string): Promise<void> {
+    const existing = await db.panen.get(clientUuid);
+    await db.panen.delete(clientUuid);
+    if (existing?.server_id) {
+      await enqueue('panen', 'delete', clientUuid, { server_id: existing.server_id });
+    }
+  },
+};
+
+/* --------------------------- MUSIM TANAM --------------------------- */
+
+import type { MusimStatus } from '../types';
+
+export interface MusimTanamInput {
+  lahan_uuid: string;
+  komoditas: string;
+  tanggal_mulai: string;
+  tanggal_selesai?: string | null;
+  status?: MusimStatus;
+  catatan?: string | null;
+}
+
+export const musimTanamRepo = {
+  async list(): Promise<MusimTanamLocal[]> {
+    const rows = await db.musim_tanam.toArray();
+    return rows.sort((a, b) => b.tanggal_mulai.localeCompare(a.tanggal_mulai) || b.created_at.localeCompare(a.created_at));
+  },
+
+  async getActiveByLahan(lahanUuid: string): Promise<MusimTanamLocal | undefined> {
+    return (await db.musim_tanam.where('lahan_uuid').equals(lahanUuid).toArray())
+      .filter(m => m.status === 'aktif')
+      .sort((a, b) => b.tanggal_mulai.localeCompare(a.tanggal_mulai))[0];
+  },
+
+  async create(input: MusimTanamInput): Promise<MusimTanamLocal> {
+    const ts = nowIso();
+    const lahan = await db.lahan.get(input.lahan_uuid);
+    const record: MusimTanamLocal = {
+      client_uuid: newClientUuid(),
+      server_id: null,
+      lahan_uuid: input.lahan_uuid,
+      lahan_server_id: lahan?.server_id ?? null,
+      komoditas: input.komoditas,
+      tanggal_mulai: input.tanggal_mulai,
+      tanggal_selesai: input.tanggal_selesai ?? null,
+      status: input.status ?? 'aktif',
+      catatan: input.catatan ?? null,
+      created_at: ts,
+      updated_at: ts,
+      _dirty: 1,
+    };
+    await db.musim_tanam.put(record);
+    await enqueue('musim_tanam', 'create', record.client_uuid, {
+      client_uuid: record.client_uuid,
+      lahan_uuid: record.lahan_uuid,
+      komoditas: record.komoditas,
+      tanggal_mulai: record.tanggal_mulai,
+      tanggal_selesai: record.tanggal_selesai,
+      status: record.status,
+      catatan: record.catatan,
+    });
+    return record;
+  },
+
+  async update(clientUuid: string, input: Partial<MusimTanamInput>): Promise<MusimTanamLocal> {
+    const existing = await db.musim_tanam.get(clientUuid);
+    if (!existing) throw new Error('Musim tanam tidak ditemukan');
+    const updated: MusimTanamLocal = {
+      ...existing,
+      ...input,
+      updated_at: nowIso(),
+      _dirty: 1,
+    };
+    await db.musim_tanam.put(updated);
+    if (updated.server_id) {
+      await enqueue('musim_tanam', 'update', clientUuid, {
+        server_id: updated.server_id,
+        komoditas: updated.komoditas,
+        tanggal_mulai: updated.tanggal_mulai,
+        tanggal_selesai: updated.tanggal_selesai,
+        status: updated.status,
+        catatan: updated.catatan,
+      });
+    }
+    return updated;
+  },
+
+  async remove(clientUuid: string): Promise<void> {
+    const existing = await db.musim_tanam.get(clientUuid);
+    await db.musim_tanam.delete(clientUuid);
+    if (existing?.server_id) {
+      await enqueue('musim_tanam', 'delete', clientUuid, { server_id: existing.server_id });
     }
   },
 };

@@ -5,7 +5,7 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class AktivitasRequest extends FormRequest
+class PanenRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -21,15 +21,15 @@ class AktivitasRequest extends FormRequest
 
         return [
             'client_uuid' => ['required', 'uuid'],
-            // lahan_id wajib ada DAN milik user yang sama (cegah IDOR).
             'lahan_id' => [
                 'required',
                 Rule::exists('lahan', 'id')->where(fn ($q) => $q->where('user_id', $userId)),
             ],
-            'tipe' => ['required', Rule::in(['semai', 'pindah_tanam', 'pemupukan', 'pestisida'])],
             'tanggal' => ['required', 'date'],
-            'jenis_pupuk' => ['nullable', 'string', 'max:255'],
-            'jenis_pestisida' => ['nullable', 'string', 'max:255'],
+            'berat' => ['required', 'numeric', 'gt:0'],
+            'grade' => ['nullable', 'string', 'max:255'],
+            'harga_jual' => ['nullable', 'numeric', 'gte:0'],
+            'pembeli' => ['nullable', 'string', 'max:255'],
             'catatan' => ['nullable', 'string'],
         ];
     }

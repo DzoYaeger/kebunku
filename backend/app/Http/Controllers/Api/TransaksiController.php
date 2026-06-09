@@ -74,6 +74,24 @@ class TransaksiController extends Controller
         return response()->json(null, 204);
     }
 
+    public function update(Request $request, Transaksi $transaksi): JsonResponse
+    {
+        abort_unless($transaksi->user_id === $request->user()->id, 404);
+
+        $validated = $request->validate([
+            'tipe' => ['sometimes', 'in:kas_keluar,kas_masuk'],
+            'kategori' => ['sometimes', 'string', 'max:255'],
+            'komoditas' => ['nullable', 'string', 'max:255'],
+            'nominal' => ['sometimes', 'numeric', 'gt:0'],
+            'tanggal' => ['sometimes', 'date'],
+            'catatan' => ['nullable', 'string'],
+        ]);
+
+        $transaksi->update($validated);
+
+        return (new TransaksiResource($transaksi->fresh()))->response()->setStatusCode(200);
+    }
+
     public function ringkasanKomoditas(Request $request): JsonResponse
     {
         $data = $request->user()->transaksi()

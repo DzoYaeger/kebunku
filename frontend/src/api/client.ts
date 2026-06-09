@@ -22,10 +22,13 @@ api.interceptors.request.use((config) => {
 });
 
 // Tangani 401: cabut token lokal & beri tahu app untuk logout.
+// Skip untuk endpoint login/register — 401 di situ berarti kredensial salah, bukan sesi expired.
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 401) {
+    const url = error.config?.url ?? '';
+    const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register');
+    if (error.response?.status === 401 && !isAuthEndpoint) {
       setToken(null);
       window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
     }
@@ -36,6 +39,11 @@ api.interceptors.response.use(
 // Helper: deteksi error validasi server (422) — bukan error jaringan.
 export function isValidationError(error: unknown): boolean {
   return axios.isAxiosError(error) && error.response?.status === 422;
+}
+
+// Helper: deteksi error kredensial salah (401) dari endpoint login.
+export function isCredentialsError(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 401;
 }
 
 // Helper: deteksi kegagalan jaringan (tidak ada response dari server).
