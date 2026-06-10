@@ -11,9 +11,17 @@ export async function listSessions(): Promise<ChatSession[]> {
   return res.data.data;
 }
 
-export async function createSession(lahanId?: number | null): Promise<ChatSession> {
+export async function listKeluhanSessions(lahanId: number): Promise<ChatSession[]> {
+  const res = await api.get<ApiCollection<ChatSession>>('/chat/sessions', {
+    params: { lahan_id: lahanId, is_keluhan: 1 },
+  });
+  return res.data.data;
+}
+
+export async function createSession(lahanId?: number | null, isKeluhan = false): Promise<ChatSession> {
   const res = await api.post<ApiResource<ChatSession>>('/chat/sessions', {
     lahan_id: lahanId ?? null,
+    is_keluhan: isKeluhan,
   });
   return res.data.data;
 }
@@ -25,6 +33,14 @@ export async function getSession(id: number): Promise<ChatSession> {
 
 export async function deleteSession(id: number): Promise<void> {
   await api.delete(`/chat/sessions/${id}`);
+}
+
+export async function toggleKeluhanSession(id: number, isKeluhan: boolean, lahanId?: number | null): Promise<ChatSession> {
+  const res = await api.put<ApiResource<ChatSession>>(`/chat/sessions/${id}/keluhan`, {
+    is_keluhan: isKeluhan,
+    lahan_id: lahanId ?? undefined,
+  });
+  return res.data.data;
 }
 
 export async function sendMessage(

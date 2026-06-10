@@ -105,5 +105,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/chat/sessions', [ChatController::class, 'store']);
     Route::get('/chat/sessions/{chatSession}', [ChatController::class, 'show']);
     Route::delete('/chat/sessions/{chatSession}', [ChatController::class, 'destroy']);
+    Route::put('/chat/sessions/{chatSession}/keluhan', [ChatController::class, 'toggleKeluhan']);
     Route::post('/chat/sessions/{chatSession}/messages', [ChatController::class, 'sendMessage']);
 });

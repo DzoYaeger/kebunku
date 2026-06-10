@@ -39,8 +39,7 @@ import AktivitasListPage from './pages/Aktivitas/AktivitasListPage';
 import KeuanganPage from './pages/Keuangan/KeuanganPage';
 import ManajemenPupukPage from './pages/Perawatan/ManajemenPupukPage';
 import SettingsPage from './pages/Settings/SettingsPage';
-import ChatListPage from './pages/Chat/ChatListPage';
-import ChatRoomPage from './pages/Chat/ChatRoomPage';
+import ChatPage from './pages/Chat/ChatPage';
 import PanenListPage from './pages/Panen/PanenListPage';
 
 // Shell tab utama
@@ -56,8 +55,7 @@ function MainTabs(): React.JSX.Element {
         <Route exact path="/app/keuangan" component={KeuanganPage} />
         <Route exact path="/app/manajemen-pupuk" component={ManajemenPupukPage} />
         <Route exact path="/app/pengaturan" component={SettingsPage} />
-        <Route exact path="/app/chat" component={ChatListPage} />
-        <Route exact path="/app/chat/:id" component={ChatRoomPage} />
+        <Route exact path="/app/chat" component={ChatPage} />
         <Route exact path="/app">
           <Redirect to="/app/dashboard" />
         </Route>

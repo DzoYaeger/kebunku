@@ -74,15 +74,20 @@ class CarePlanService
             . "  1. KOCOR: campuran pupuk yang dilarutkan dalam {$userCtx['takaran_pupuk']} (berikan dosis per ember/wadah)\n"
             . "  2. BENAM: pupuk padat yang ditaburkan/dibenamkan ke tanah dekat akar ({$userCtx['takaran_benam']})\n"
             . "- Gunakan KOMBINASI 2-4 jenis pupuk per metode.\n\n"
+            . "ATURAN FIELD \"aktivitas\":\n"
+            . "- Untuk PEMUPUKAN: isi dengan \"Pemupukan\" saja.\n"
+            . "- Untuk PESTISIDA: isi dengan NAMA PESTISIDA SPESIFIK + DOSIS per {$userCtx['takaran_pestisida']}. Contoh: \"Prevathon 1ml/L + Antracol 2g/L per {$userCtx['takaran_pestisida']}\"\n"
+            . "- JANGAN tulis kata \"Pestisida\" saja! Harus berisi nama bahan dan dosisnya.\n"
+            . "- Field \"detail\" berisi ALASAN/PENJELASAN mengapa bahan itu diberikan pada minggu tersebut.\n\n"
             . "Buatkan jadwal perawatan dalam format JSON (HANYA JSON, tanpa markdown):\n"
             . "{\n"
             . "  \"summary\": \"ringkasan singkat rencana\",\n"
             . "  \"estimasi_panen\": \"YYYY-MM-DD\",\n"
             . "  \"jadwal\": [\n"
-            . "    {\"minggu\": 1, \"tanggal\": \"YYYY-MM-DD\", \"aktivitas\": \"pemupukan|pestisida|lainnya\", \"detail\": \"penjelasan\", \"kocor\": \"campuran + dosis per {$userCtx['takaran_pupuk']}\", \"benam\": \"pupuk padat + dosis {$userCtx['takaran_benam']}\", \"catatan\": \"tips\"}\n"
+            . "    {\"minggu\": 1, \"tanggal\": \"YYYY-MM-DD\", \"aktivitas\": \"nama bahan + dosis (untuk pestisida) atau 'Pemupukan' (untuk pupuk)\", \"detail\": \"alasan/penjelasan mengapa diberikan\", \"kocor\": \"campuran + dosis per {$userCtx['takaran_pupuk']}\", \"benam\": \"pupuk padat + dosis {$userCtx['takaran_benam']}\", \"catatan\": \"tips\"}\n"
             . "  ]\n"
             . "}\n\n"
-            . "Untuk jadwal pestisida, field kocor dan benam boleh null. Minimal 8 entry.";
+            . "Untuk jadwal pestisida, field kocor dan benam harus null. Minimal 8 entry.";
 
         $response = $this->groq->chat([
             'model' => 'llama-3.3-70b-versatile',

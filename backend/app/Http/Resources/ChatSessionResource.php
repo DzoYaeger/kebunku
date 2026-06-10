@@ -19,6 +19,7 @@ class ChatSessionResource extends JsonResource
             'id' => $this->id,
             'judul' => $this->judul,
             'lahan_id' => $this->lahan_id,
+            'is_keluhan' => (bool) $this->is_keluhan,
             'lahan' => $this->whenLoaded('lahan', fn () => $this->lahan ? [
                 'id' => $this->lahan->id,
                 'nomor_bed' => $this->lahan->nomor_bed,

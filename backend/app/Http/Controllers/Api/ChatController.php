@@ -19,15 +19,21 @@ class ChatController extends Controller
     private const TEXT_MODEL = 'llama-3.3-70b-versatile';
     private const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 
-    /** List sesi chat milik user (terbaru dulu). */
+    /** List sesi chat milik user (terbaru dulu). Filter: ?lahan_id=X&is_keluhan=1 */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $sessions = ChatSession::where('user_id', $request->user()->id)
+        $query = ChatSession::where('user_id', $request->user()->id)
             ->with('lahan')
-            ->orderByDesc('updated_at')
-            ->get();
+            ->orderByDesc('updated_at');
 
-        return ChatSessionResource::collection($sessions);
+        if ($request->filled('lahan_id')) {
+            $query->where('lahan_id', (int) $request->input('lahan_id'));
+        }
+        if ($request->filled('is_keluhan')) {
+            $query->where('is_keluhan', (bool) $request->input('is_keluhan'));
+        }
+
+        return ChatSessionResource::collection($query->get());
     }
 
     /** Buat sesi baru (opsional pilih lahan). */
@@ -36,12 +42,14 @@ class ChatController extends Controller
         $validated = $request->validate([
             'lahan_id' => 'nullable|exists:lahan,id',
             'judul' => 'nullable|string|max:255',
+            'is_keluhan' => 'nullable|boolean',
         ]);
 
         $session = ChatSession::create([
             'user_id' => $request->user()->id,
             'lahan_id' => $validated['lahan_id'] ?? null,
             'judul' => $validated['judul'] ?? 'Konsultasi Baru',
+            'is_keluhan' => $validated['is_keluhan'] ?? false,
         ]);
 
         return response()->json([
@@ -68,6 +76,26 @@ class ChatController extends Controller
         $chatSession->delete();
 
         return response()->json(['message' => 'Sesi dihapus.']);
+    }
+
+    /** Toggle is_keluhan flag pada sesi. */
+    public function toggleKeluhan(Request $request, ChatSession $chatSession): JsonResponse
+    {
+        $this->authorizeSession($request, $chatSession);
+
+        $request->validate([
+            'is_keluhan' => 'required|boolean',
+            'lahan_id' => 'nullable|exists:lahan,id',
+        ]);
+
+        $chatSession->update([
+            'is_keluhan' => $request->boolean('is_keluhan'),
+            'lahan_id' => $request->input('lahan_id', $chatSession->lahan_id),
+        ]);
+
+        return response()->json([
+            'data' => new ChatSessionResource($chatSession->load('lahan')),
+        ]);
     }
 
     /** Kirim pesan ke AI dalam sebuah sesi. */
@@ -139,14 +167,20 @@ class ChatController extends Controller
 
     private function callGroq(ChatSession $session, string $userContent, ?string $imagePath): string
     {
-        // Konteks tanaman bila sesi terkait lahan.
+        // System prompt: fokus pada konteks sesi ini.
         $context = 'Kamu adalah konsultan pertanian ahli bernama "Asisten Kebunku". '
-            . 'Jawab pertanyaan petani dengan ramah, praktis, dan dalam bahasa Indonesia.';
+            . 'Jawab pertanyaan petani dengan ramah, praktis, dan dalam bahasa Indonesia.' . "\n\n"
+            . 'ATURAN PENTING:' . "\n"
+            . '1. Fokus HANYA pada topik yang dibahas di sesi konsultasi ini.' . "\n"
+            . '2. Setiap follow-up question dari user pasti masih terkait topik awal sesi ini — jawab dalam konteks itu.' . "\n"
+            . '3. Jangan menjawab di luar topik kecuali user secara eksplisit mengganti topik.' . "\n"
+            . '4. Jika ada informasi dari sesi konsultasi lain yang relevan, gunakan untuk memperkaya jawaban.';
 
+        // Konteks tanaman bila sesi terkait lahan.
         if ($session->lahan_id) {
             $lahan = Lahan::find($session->lahan_id);
             if ($lahan) {
-                $context .= "\n\nKonteks tanaman yang dikonsultasikan:\n"
+                $context .= "\n\nKonteks tanaman sesi ini:\n"
                     . "- Komoditas: {$lahan->komoditas}\n"
                     . "- Nomor Bed: {$lahan->nomor_bed}\n"
                     . "- Status: {$lahan->status}\n"
@@ -154,22 +188,40 @@ class ChatController extends Controller
             }
         }
 
-        // Riwayat percakapan (maks 20 pesan terakhir).
+        // Ringkasan sesi lain yang mungkin relevan (maks 5 sesi terbaru, hanya judul + pesan pertama user).
+        $otherSessions = ChatSession::where('user_id', $session->user_id)
+            ->where('id', '!=', $session->id)
+            ->orderByDesc('updated_at')
+            ->limit(5)
+            ->with(['messages' => fn ($q) => $q->orderBy('created_at')->limit(2)])
+            ->get();
+
+        if ($otherSessions->isNotEmpty()) {
+            $context .= "\n\nRingkasan konsultasi lain milik petani ini (gunakan jika relevan):";
+            foreach ($otherSessions as $other) {
+                $firstMsg = $other->messages->where('role', 'user')->first();
+                $firstReply = $other->messages->where('role', 'assistant')->first();
+                $context .= "\n- Sesi \"{$other->judul}\": "
+                    . ($firstMsg ? mb_substr($firstMsg->content, 0, 100) : '(kosong)')
+                    . ($firstReply ? ' → AI: ' . mb_substr($firstReply->content, 0, 100) : '');
+            }
+        }
+
+        // Seluruh riwayat percakapan sesi ini (maks 30 pesan).
         $history = $session->messages()
             ->orderBy('created_at')
             ->get()
-            ->slice(-20)
+            ->slice(-30)
             ->map(fn ($m) => ['role' => $m->role, 'content' => $m->content])
             ->values()
             ->toArray();
 
         $messages = [['role' => 'system', 'content' => $context]];
 
-        // Bila ada gambar pada pesan terakhir, pakai vision model dengan format multimodal.
+        // Bila ada gambar pada pesan terakhir, pakai vision model.
         $useVision = $imagePath !== null;
 
         if ($useVision) {
-            // Riwayat sebelumnya (tanpa pesan user terakhir yang baru disimpan).
             $previous = array_slice($history, 0, -1);
             foreach ($previous as $h) {
                 $messages[] = $h;

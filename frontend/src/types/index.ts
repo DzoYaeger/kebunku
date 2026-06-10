@@ -164,6 +164,7 @@ export interface ChatSession {
   id: number;
   judul: string;
   lahan_id: number | null;
+  is_keluhan: boolean;
   lahan?: ChatSessionLahan | null;
   messages?: ChatMessage[];
   created_at: string;

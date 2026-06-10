@@ -12,6 +12,7 @@ class ChatSession extends Model
         'user_id',
         'lahan_id',
         'judul',
+        'is_keluhan',
     ];
 
     /**
